@@ -1,0 +1,51 @@
+unit StartOver;
+
+{ Starting over, for a player who wants a fresh beginning (a second player on
+  the same computer, say). No window code. Two levels:
+
+    EraseEverything     a brand-new player: coins, undo and hint cards, which
+                        hands have paid, campaign progress, the mode, and every
+                        saved hand and slot (the campaign's too), and the personal records.
+    RestartCampaignOnly the story starts again from the first vampire; your
+                        coins and cards (and Free Play hands) are kept.
+
+  Only the game's own save data is touched. }
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  SysUtils, Inventory, Session, Campaign, Settings, HandFile, Records;
+
+{ SaveDir is the folder holding the saved hands. The caller must start a new
+  hand afterwards (the one in memory is not touched). }
+procedure EraseEverything(ASession: TGameSession; ACampaign: TCampaign;
+  ASettings: TSettings; ARecords: TRecords; const SaveDir: string);
+
+procedure RestartCampaignOnly(ACampaign: TCampaign; const SaveDir: string);
+
+implementation
+
+procedure EraseEverything(ASession: TGameSession; ACampaign: TCampaign;
+  ASettings: TSettings; ARecords: TRecords; const SaveDir: string);
+begin
+  ASession.Inventory.Reset;              { 50 coins, no cards, no paid hands }
+  ASession.SaveNow;
+  ACampaign.Reset;                       { saved by Reset }
+  ASettings.Mode := gmFreePlay;
+  ASettings.FenwickMet := False;         { he introduces himself again }
+  ASettings.WrapUnlocked := False;       { and his Open wrap and Full deck cards are not in stock yet }
+  ASettings.StockUnlocked := False;
+  ASettings.Save;
+  ARecords.Reset;                        { personal records too }
+  DeleteAllSavedHands(SaveDir);
+end;
+
+procedure RestartCampaignOnly(ACampaign: TCampaign; const SaveDir: string);
+begin
+  ACampaign.Reset;
+  DeleteCampaignHand(SaveDir);           { a half-played duel hand goes too }
+end;
+
+end.
