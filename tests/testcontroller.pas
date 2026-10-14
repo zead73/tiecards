@@ -1133,9 +1133,10 @@ begin
   try
     C.StartWithMenu;
     Check(C.MenuOpen, 'the program opens on the start menu');
-    Check(C.MenuButtonCount = 4, 'four buttons where the program cannot quit (the web page)');
+    Check(C.MenuButtonCount = 5, 'five buttons where the program cannot quit (the web page)');
     Check((C.MenuButtonCaption(0) = 'Campaign') and (C.MenuButtonCaption(1) = 'Free Play')
-      and (C.MenuButtonCaption(2) = 'Save game') and (C.MenuButtonCaption(3) = 'Load game'), 'Campaign, Free Play, Save game and Load game');
+      and (C.MenuButtonCaption(2) = 'Save game') and (C.MenuButtonCaption(3) = 'Load game')
+      and (C.MenuButtonCaption(4) = 'Rules'), 'Campaign, Free Play, Save game, Load game and Rules');
     Check(not C.NeedsTicks, 'nothing animates behind the menu');
     U := C.GetUi;
     Check(not U.StoreEnabled and not U.CardsEnabled and not U.UndoEnabled and not U.RecordsEnabled and not U.SaveEnabled,
@@ -1214,13 +1215,33 @@ begin
     Check(C.Session.Game.Remaining = 27, 'and the Free Play hand is back as it was');
     Check(not (C.GetUi.StoreCaption = ''), 'with its toolbar');
 
+    { Rules: the front end is asked to show them; the table waits until they are closed }
+    C.ActionOpenMenu;
+    Check(not C.GetUi.ShowRules, 'no rules until asked for');
+    TapMenuButton(C, 4);
+    Check(C.GetUi.ShowRules and C.MenuOpen, 'the Rules button asks the front end to show the rules');
+    C.Tap(C.MenuButtonRect(0).Left + 5, C.MenuButtonRect(0).Top + 5);
+    Check(C.MenuOpen, 'taps wait while the rules are up');
+    C.KeyPress(True);
+    Check(C.MenuOpen and C.GetUi.ShowRules, 'and so does Esc (the front end handles it)');
+    Check((C.RulesSectionCount >= 8) and (Length(C.RulesPlainText) > 2000), 'the controller hands over the text');
+    C.ActionRulesClosed;
+    Check(not C.GetUi.ShowRules and C.MenuOpen, 'closing them leaves the menu as it was');
+    C.ActionRulesClosed;
+    Check(not C.GetUi.ShowRules, 'closing twice is harmless');
+
     { Quit }
     C.CanQuit := True;
     C.OnQuit := @W.OnQuit;
     C.ActionOpenMenu;
-    Check(C.MenuButtonCount = 5, 'five buttons where the program can quit');
-    Check(C.MenuButtonCaption(4) = 'Quit', 'the last is Quit');
-    TapMenuButton(C, 4);
+    Check(C.MenuButtonCount = 6, 'six buttons where the program can quit');
+    Check((C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Quit'), 'Rules, then Quit');
+    for I := 0 to C.MenuButtonCount - 1 do
+      Check((C.MenuButtonRect(I).Left >= 0) and (C.MenuButtonRect(I).Right <= 1520) and (C.MenuButtonRect(I).Bottom <= 584),
+        'with Quit as well, button ' + IntToStr(I) + ' is on screen');
+    Check((C.MenuButtonRect(5).Left >= C.MenuButtonRect(4).Right) and (C.MenuButtonRect(5).Top = C.MenuButtonRect(4).Top),
+      'Quit sits beside Rules');
+    TapMenuButton(C, 5);
     Check(W.Quits = 1, 'Quit tells the program to close');
     Check(C.MenuOpen, 'and the menu stays up meanwhile');
   finally

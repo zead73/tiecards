@@ -62,6 +62,7 @@ type
     FAsking: Boolean;
     procedure ControllerChanged;
     procedure AskTimer(Sender: TObject);
+    procedure ShowRulesDialog;
     procedure AnimTimer(Sender: TObject);
     procedure DrawMenu(const Full: TRect);
     procedure QuitGame;
@@ -160,7 +161,7 @@ begin
   btnRecords.Caption := UI.RecordsCaption;
   btnRecords.Enabled := UI.RecordsEnabled;
   { a record was broken: ask for initials, but not from inside a repaint }
-  if (UI.AskInitials or UI.AskCross) and not FAsking then
+  if (UI.AskInitials or UI.AskCross or UI.ShowRules) and not FAsking then
   begin
     FAsking := True;
     FAskTimer.Enabled := True;
@@ -181,7 +182,12 @@ var
 begin
   FAskTimer.Enabled := False;
   UI := FCtl.GetUi;
-  if UI.AskCross then
+  if UI.ShowRules then
+  begin
+    ShowRulesDialog;
+    FCtl.ActionRulesClosed;
+  end
+  else if UI.AskCross then
   begin
     { Keep is the default (and Esc / closing the window): nothing is destroyed by accident }
     R := QuestionDlg('Silver cross', UI.CrossPrompt, mtConfirmation,
@@ -196,10 +202,50 @@ begin
   end;
   FAsking := False;
   { in case another record was broken meanwhile }
-  if FCtl.GetUi.AskInitials or FCtl.GetUi.AskCross then
+  if FCtl.GetUi.AskInitials or FCtl.GetUi.AskCross or FCtl.GetUi.ShowRules then
   begin
     FAsking := True;
     FAskTimer.Enabled := True;
+  end;
+end;
+
+{ The rules: a modal window with the text in a scrolling box (Esc or Close ends it). }
+procedure TfrmMain.ShowRulesDialog;
+var
+  F: TForm;
+  M: TMemo;
+  B: TButton;
+begin
+  F := TForm.CreateNew(Self);
+  try
+    F.Caption := 'Rules';
+    F.Position := poOwnerFormCenter;
+    F.Width := Min(760, Screen.Width - 80);
+    F.Height := Min(680, Screen.Height - 120);
+    F.Color := RGBToColor(22, 13, 28);
+    B := TButton.Create(F);
+    B.Parent := F;
+    B.Align := alBottom;
+    B.BorderSpacing.Around := 10;
+    B.Caption := 'Close';
+    B.Default := True;
+    B.Cancel := True;                          { Esc }
+    B.ModalResult := mrOk;
+    M := TMemo.Create(F);
+    M.Parent := F;
+    M.Align := alClient;
+    M.BorderSpacing.Around := 10;
+    M.ReadOnly := True;
+    M.WordWrap := True;
+    M.ScrollBars := ssAutoVertical;
+    M.Color := RGBToColor(30, 19, 38);
+    M.Font.Color := RGBToColor(232, 224, 204);
+    M.Font.Size := 12;
+    M.Text := FCtl.RulesPlainText;
+    M.SelStart := 0;
+    F.ShowModal;
+  finally
+    F.Free;
   end;
 end;
 

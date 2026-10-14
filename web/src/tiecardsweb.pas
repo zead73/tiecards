@@ -30,6 +30,7 @@ type
     FAudioUnlocked: Boolean;
     FAskingInitials: Boolean;
     FAskingCross: Boolean;
+    FShowingRules: Boolean;
     function El(const Id: string): TJSElement;
     procedure SetText(const Id, Value: string);
     procedure SetOn(const Id: string; AOn: Boolean);
@@ -58,6 +59,9 @@ type
     function OnCrossKeep(Event: TEventListenerEvent): Boolean;
     function OnCrossPlay(Event: TEventListenerEvent): Boolean;
     procedure AnswerCross(APlayIt: Boolean);
+    procedure CloseRules;
+    function OnRulesClose(Event: TEventListenerEvent): Boolean;
+    procedure FillRules;
     function OnMenu(Event: TEventListenerEvent): Boolean;
     function OnStartOver(Event: TEventListenerEvent): Boolean;
     function OnSkip(Event: TEventListenerEvent): Boolean;
@@ -164,6 +168,18 @@ begin
   Show('btnCancel', U.Targeting);
   SetText('btnRecords', U.RecordsCaption);
   SetOn('btnRecords', U.RecordsEnabled);
+  if U.ShowRules and not FShowingRules then
+  begin
+    FShowingRules := True;
+    FillRules;
+    Show('dlgRules', True);
+    asm
+      var rb = document.getElementById('rulesBody');
+      if (rb) { rb.scrollTop = 0; }
+      var rc = document.getElementById('rulesClose');
+      if (rc) { rc.focus(); }
+    end;
+  end;
   if U.AskCross and not FAskingCross then
   begin
     FAskingCross := True;
@@ -276,6 +292,12 @@ end;
 function TWebApp.OnKeyDown(Event: TEventListenerEvent): Boolean;
 begin
   UnlockAudio;
+  if FShowingRules then                    { the rules: Esc closes; arrows and the wheel scroll }
+  begin
+    if string(TJSObject(Event)['key']) = 'Escape' then CloseRules;
+    Result := string(TJSObject(Event)['key']) = 'Escape';
+    Exit;
+  end;
   if FAskingCross then                     { the silver cross question: Esc = keep it }
   begin
     if string(TJSObject(Event)['key']) = 'Escape' then AnswerCross(False);
@@ -366,6 +388,53 @@ begin
   Show('dlgInitials', False);
   FAskingInitials := False;
   FCtl.ActionSubmitInitials(S);
+end;
+
+{ The rules: one heading and some paragraphs for each section, in a scrolling box. }
+procedure TWebApp.FillRules;
+var
+  I, N: Integer;
+  Heads, Bodies: TJSArray;
+begin
+  N := FCtl.RulesSectionCount;
+  Heads := TJSArray.new;
+  Bodies := TJSArray.new;
+  for I := 0 to N - 1 do
+  begin
+    Heads.push(FCtl.RulesHeading(I));
+    Bodies.push(FCtl.RulesBody(I));
+  end;
+  asm
+    var box = document.getElementById('rulesBody');
+    if (box) {
+      box.textContent = '';
+      for (var i = 0; i < Heads.length; i++) {
+        var h = document.createElement('h3');
+        h.textContent = Heads[i];
+        box.appendChild(h);
+        var paras = Bodies[i].split('\n');
+        for (var j = 0; j < paras.length; j++) {
+          if (paras[j] === '') { continue; }
+          var p = document.createElement('p');
+          p.textContent = paras[j];
+          box.appendChild(p);
+        }
+      }
+    }
+  end;
+end;
+
+procedure TWebApp.CloseRules;
+begin
+  Show('dlgRules', False);
+  FShowingRules := False;
+  FCtl.ActionRulesClosed;
+end;
+
+function TWebApp.OnRulesClose(Event: TEventListenerEvent): Boolean;
+begin
+  CloseRules;
+  Result := True;
 end;
 
 { The silver cross question: Play it anyway, or Keep the cross. }
@@ -470,6 +539,7 @@ begin
   Listen('btnCards', 'click', @OnCards);
   Listen('btnCancel', 'click', @OnCancel);
   Listen('btnRecords', 'click', @OnRecords);
+  Listen('rulesClose', 'click', @OnRulesClose);
   Listen('crossKeep', 'click', @OnCrossKeep);
   Listen('crossPlay', 'click', @OnCrossPlay);
   Listen('initialsOk', 'click', @OnInitialsOk);

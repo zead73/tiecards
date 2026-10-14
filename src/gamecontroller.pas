@@ -23,7 +23,7 @@ interface
 uses
   SysUtils, Types, Math, Cards, TriPeaks, Inventory, Session, Sound, Anim, Stage,
   NewGameAnim, Vampires, Story, Campaign, Duel, DuelSession, DuelInfo, Scenes,
-  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records;
+  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules;
 
 const
   { The table is laid out on a fixed design grid and scaled to fit. }
@@ -72,6 +72,9 @@ type
       ActionAnswerCross(True) to play it anyway or (False) to keep it. }
     AskCross: Boolean;
     CrossPrompt: string;
+    { The Rules button was pressed: the front end shows the rules (RulesSectionCount,
+      RulesHeading, RulesBody) and calls ActionRulesClosed when they are dismissed. }
+    ShowRules: Boolean;
   end;
 
   { The Store (Fenwick's goods) and the tray of your own special cards are two
@@ -118,6 +121,7 @@ type
     FInScene: Boolean;
     FAllowBottomPanel: Boolean;
     FToast: string;
+    FRulesShow: Boolean;       { the rules are being shown (by the front end) }
     FCrossAsk: Integer;        { the silver cross card a tap is waiting to destroy (-1 = none) }
     FOnChange: TChangeEvent;
     FDeckProvider: TDeckProvider;
@@ -212,7 +216,7 @@ type
     { ---- the start menu (a picture of the house and three buttons) ---- }
     property MenuOpen: Boolean read FMenuOpen;
     function MenuButtonCount: Integer;
-    function MenuButtonCaption(I: Integer): string;   { Campaign, Free Play, Save game, Load game, Quit }
+    function MenuButtonCaption(I: Integer): string;   { Campaign, Free Play, Save game, Load game, Rules, Quit }
     function MenuButtonRect(I: Integer): TRect;
     function MenuButtonEnabled(I: Integer): Boolean;  { Save needs a hand that can be saved }
     function MenuTitleRect: TRect;
@@ -280,6 +284,11 @@ type
     procedure ActionOpenRecords;
     procedure ActionSubmitInitials(const S: string);     { '' = skip }
     procedure ActionAnswerCross(APlayIt: Boolean);       { the question in UiState.AskCross }
+    procedure ActionRulesClosed;                         { the rules shown for UiState.ShowRules were dismissed }
+    function RulesSectionCount: Integer;
+    function RulesHeading(I: Integer): string;
+    function RulesBody(I: Integer): string;               { paragraphs separated by Rules.RulesBreak }
+    function RulesPlainText: string;                      { all of it, as one text }
     property Records: TRecords read FRecords;
     procedure ActionCloseOverlay;
     procedure ActionCancel;                    { stop choosing a card for a special card }
@@ -399,11 +408,11 @@ const
 
 function TGameController.MenuButtonCount: Integer;
 begin
-  if FCanQuit then Result := 5 else Result := 4;
+  if FCanQuit then Result := 6 else Result := 5;
 end;
 
 { 0 Campaign, 1 Free Play, 2 Save game, 3 Load game (those two share a row),
-  then Quit. }
+  4 Rules, 5 Quit (Quit shares the Rules row). }
 function TGameController.MenuButtonCaption(I: Integer): string;
 begin
   case I of
@@ -411,7 +420,8 @@ begin
     1: Result := 'Free Play';
     2: Result := 'Save game';
     3: Result := 'Load game';
-    4: Result := 'Quit';
+    4: Result := 'Rules';
+    5: Result := 'Quit';
   else
     Result := '';
   end;
@@ -436,8 +446,7 @@ function TGameController.MenuButtonRect(I: Integer): TRect;
 var
   BW, BH, Gap, Top, X, Row, Rows, HalfW: Integer;
 begin
-  Rows := 3;
-  if FCanQuit then Rows := 4;
+  Rows := 4;
   BW := Min(380, FVW * 62 div 100);
   BH := Max(34, Min(56, FVH * 7 div 100));
   Gap := BH div 4;
@@ -452,7 +461,11 @@ begin
   else
     Row := 3;
   end;
-  if I = 2 then
+  if FCanQuit and (I = 4) then
+    Result := Rect(X, Top + Row * (BH + Gap), X + HalfW, Top + Row * (BH + Gap) + BH)
+  else if FCanQuit and (I = 5) then
+    Result := Rect(X + BW - HalfW, Top + Row * (BH + Gap), X + BW, Top + Row * (BH + Gap) + BH)
+  else if I = 2 then
     Result := Rect(X, Top + Row * (BH + Gap), X + HalfW, Top + Row * (BH + Gap) + BH)
   else if I = 3 then
     Result := Rect(X + BW - HalfW, Top + Row * (BH + Gap), X + BW, Top + Row * (BH + Gap) + BH)
@@ -506,6 +519,11 @@ begin
     2: if MenuButtonEnabled(2) then OpenSlots(True);
     3: OpenSlots(False);
     4:
+    begin
+      FRulesShow := True;               { the front end shows them }
+      Changed;
+    end;
+    5:
       if FCanQuit and Assigned(FOnQuit) then FOnQuit();
   end;
 end;
@@ -1014,6 +1032,7 @@ begin
   Result.AskInitials := NeedInitials;
   Result.InitialsPrompt := PendingText;
   Result.InitialsDefault := FRecords.LastInitials;
+  Result.ShowRules := FRulesShow;
   Result.AskCross := FCrossAsk >= 0;
   Result.CrossPrompt := 'This card carries the silver cross. Playing it as an ordinary card destroys the cross: only a Wild card can claim it. Play it anyway?';
   Result.SaveEnabled := not FCampaignMode and not Animating and not FGame.IsWon;
@@ -1446,6 +1465,7 @@ end;
 
 procedure TGameController.KeyPress(IsEscape: Boolean);
 begin
+  if FRulesShow then Exit;
   if FMenuOpen and (FOverlay = okSlots) then
   begin
     if IsEscape then ActionCloseOverlay;     { back to the menu }
@@ -1498,7 +1518,7 @@ var
   I: Integer;
   P: TPoint;
 begin
-  if FCrossAsk >= 0 then Exit;               { the question has to be answered first }
+  if (FCrossAsk >= 0) or FRulesShow then Exit;   { a question or the rules have to be dealt with first }
   if FOverlay <> okNone then                 { the slot screen sits over the menu too }
   begin
     TapOverlay(X, Y);
@@ -2281,6 +2301,32 @@ begin
     AutoSave;
   end;
   Changed;
+end;
+
+procedure TGameController.ActionRulesClosed;
+begin
+  FRulesShow := False;
+  Changed;
+end;
+
+function TGameController.RulesSectionCount: Integer;
+begin
+  Result := Rules.RulesSectionCount;
+end;
+
+function TGameController.RulesHeading(I: Integer): string;
+begin
+  Result := Rules.RulesHeading(I, FStory);
+end;
+
+function TGameController.RulesBody(I: Integer): string;
+begin
+  Result := Rules.RulesBody(I, FStory);
+end;
+
+function TGameController.RulesPlainText: string;
+begin
+  Result := Rules.RulesPlainText(FStory);
 end;
 
 procedure TGameController.ActionOpenRecords;

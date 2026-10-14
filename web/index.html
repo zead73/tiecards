@@ -38,6 +38,10 @@
     display:flex; flex-direction:column; gap:10px; max-height:100%; overflow:auto; }
   .dlg input { font:inherit; font-size:24px; letter-spacing:6px; text-transform:uppercase; text-align:center; padding:8px; color:#e8e0cc; background:#0b0710; border:1px solid var(--gold); border-radius:8px; width:8em; align-self:center; }
   .dlg h2 { margin:0 0 4px; font-size:20px; color:var(--gold); }
+  .dlg.rules { max-width:680px; max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); }
+  #rulesBody { overflow-y:auto; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; gap:10px; padding-right:6px; min-height:0; }
+  #rulesBody h3 { margin:10px 0 0; font-size:17px; color:var(--gold); }
+  #rulesBody p { margin:0; }
   .dlg p { margin:0; line-height:1.35; font-size:16px; }
   .dlg .hint { color:var(--dim); }
   .dlg button.danger { border-color:#d6505c; }
@@ -83,6 +87,14 @@
     <input id="initialsInput" type="text" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false">
     <button id="initialsOk">OK</button>
     <button id="initialsSkip">Skip</button>
+  </div>
+</div>
+
+<div id="dlgRules" class="overlay" style="display:none">
+  <div class="dlg rules">
+    <h2>Rules</h2>
+    <div id="rulesBody"></div>
+    <button id="rulesClose" autofocus>Close</button>
   </div>
 </div>
 

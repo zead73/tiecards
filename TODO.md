@@ -125,6 +125,18 @@ Ideas to review later.
       exempt. Tell the tablet player to use Share > Add to Home Screen.
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
+## Rules page and README (2026-10-14)
+
+- [x] **Rules button on the start menu.** `src/rules.pas` holds the player's rules as
+      sections, built with `Format` from the real constants. The menu has a Rules button
+      (Campaign / Free Play / Save | Load / Rules | Quit); the controller sets
+      `UiState.ShowRules` and the front end shows it: a scrolling modal window on the
+      desktop (`ShowRulesDialog`), a scrolling `dlgRules` dialog on the web. `tests/testrules.pas`
+      checks every card, vampire and number is in the text. Not built on the canvas, so no
+      font-fitting and touch scrolling works.
+- [x] **README.md** (build steps from the scripts, tests, layout, art). The License section
+      now points to the MIT `LICENSE` (copyright line: "Zead", the GitHub profile name).
+
 ## Ideas
 
 - [x] **Vampire panel.** Done: a framed panel on the left during campaign
@@ -269,8 +281,11 @@ Ideas to review later.
 
 ## Loose ends I know about
 
-- [ ] Balance numbers are placeholders: coin rewards (25 / 35 / 50 per vampire),
-      the 5-coin step per lost hand, the 5-coin floor, pack prices and sizes.
+- [ ] Balance numbers are placeholders: coin rewards (20 / 30 / 40 per win in the campaign,
+      25 in Free Play), the 2-coin step per lost hand, the 5-coin floor, the 4-coin bite,
+      the Store percentages (50 / 60 / 75) and the pack prices and sizes. The numbers
+      live in `src/inventory.pas`, `src/vampires.pas` and `src/specials.pas`; the
+      player's Rules text (`src/rules.pas`) reads them, so it follows any change.
       (The 2-coin missed-move penalty and its sting sound are approved for now.)
 - [ ] Listen to the duel sounds on Windows and Linux (bell toll, fatal blow, card
       deal flicks) and tell me if any need changing. The deal flicks can trail
