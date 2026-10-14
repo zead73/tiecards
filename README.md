@@ -9,6 +9,34 @@ fixed-price help.
 The desktop game runs on Linux and Windows. The same game also runs in a web
 browser (tablets and phones included), and can be played offline there.
 
+## Screenshots
+
+The start menu:
+
+![The start menu, with the house on the hill](docs/screenshots/menu.png)
+
+Free Play is plain Tri Peaks, with the house in the side panel:
+
+![A Free Play hand](docs/screenshots/free-play.png)
+
+A Campaign hand against Lady Carmilla Nox. The panel shows the duel, what a win
+pays and her rules. She chains cards:
+
+![A Campaign hand against Lady Carmilla Nox, with chained cards](docs/screenshots/campaign.png)
+
+The same hand with a Seer's eye used. Face-down cards are shown, and the gold
+ring marks the silver cross that a Wild card can claim:
+
+![The same hand with every card revealed and the silver cross showing](docs/screenshots/silver-cross.png)
+
+Fenwick Grimm's Store, where everything has a fixed price:
+
+![Fenwick Grimm's Store](docs/screenshots/store.png)
+
+The vampires speak between hands:
+
+![Lady Carmilla Nox speaking after a lost hand](docs/screenshots/vampire.png)
+
 ## Playing
 
 Start the game and press **Campaign** or **Free Play**. The **Rules** button on
@@ -104,6 +132,7 @@ if they are missing. Keep it green after any change to `src/` or `web/src/`.
 | `web/` | The browser front end: `web/src` (pas2js code), `index.html`, `glue.js`, the service worker template, `build.sh` |
 | `assets/` | Card faces, vampire and shopkeeper portraits, the house, special-card pictures, the icon, and `story/story.ini` (all the dialogue) |
 | `tests/` | Console test programs, one per area |
+| `docs/` | The screenshots used in this README |
 | `tools/` | The art scripts (Python), `check-pas2js.sh`, the icon builder, and a solver used to tune the vampires' difficulty |
 
 The desktop and the web page are thin: they draw what `GameController` says and
