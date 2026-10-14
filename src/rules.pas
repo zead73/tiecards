@@ -135,8 +135,8 @@ begin
     Pays := Pays + Format('%d', [VampireWinCoins[V]]);
   end;
   Result :=
-    Format('In the Campaign you duel %d vampires in turn. To kill one you must win %d hands against him.', [VampireCount, WinsToKill]) + RulesBreak +
-    Format('Each won hand pays coins at once (%s coins for the %s, %s and %s). The last hand that kills him pays a bonus on top: ',
+    Format('In the Campaign you duel %d vampires in turn. To kill one you must win %d hands against that vampire.', [VampireCount, WinsToKill]) + RulesBreak +
+    Format('Each won hand pays coins at once (%s coins for the %s, %s and %s). The last hand, the one that kills the vampire, pays a bonus on top: ',
       [Pays, RankNames[0], RankNames[1], RankNames[2]]) +
     Format('%d, %d and %d coins.', [VampireKillBonus[0], VampireKillBonus[1], VampireKillBonus[2]]) + RulesBreak +
     Format('Winning also earns cards: %d hint card for each of the first %d wins, and %d undo card and %d hint cards for the kill.',
@@ -176,7 +176,7 @@ begin
       [AStory.Name(1), AStory.Name(2)]) + RulesBreak +
     'It is drawn on one card. If the card is face down you cannot see it, but the panel tells you a cross is on the table, and the Store is open until your first move, so you can buy a Wild card first.' + RulesBreak +
     'Only a Wild card claims it: use the Wild card on the cross card. Playing that card as an ordinary move, or using a Wood Stake on it, destroys the cross. The game asks before it lets you play it as an ordinary card.' + RulesBreak +
-    Format('Once claimed, from the next hand on the vampire plays like %s: a full stock, King and Ace wrap, and no trick. His pay stays the same. For %s it lasts until she falls. For %s it lasts %d hands, won or lost (the hand you claim it in does not count).',
+    Format('Once claimed, from the next hand on the vampire plays like %s: a full stock, King and Ace wrap, and no trick. The pay stays the same. For %s it lasts until the duel ends. For %s it lasts %d hands, won or lost (the hand you claim it in does not count).',
       [AStory.Name(0), AStory.Name(1), AStory.Name(2), VampireEaseHands[2]]) + RulesBreak +
     'If you lose the game that carries the cross, the next deal still has it, in a new place.';
 end;

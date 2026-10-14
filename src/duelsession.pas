@@ -91,9 +91,9 @@ implementation
 function CrossClaimedText(V: Integer): string;
 begin
   if VampireEaseHands[V] < 0 then
-    Result := 'The silver cross is yours! From the next hand she plays at the lowest level until she falls.'
+    Result := 'The silver cross is yours! From the next hand the vampire plays at the lowest level, until the duel ends.'
   else
-    Result := Format('The silver cross is yours! The next %d hands he plays at the lowest level.',
+    Result := Format('The silver cross is yours! The vampire plays at the lowest level for the next %d hands.',
       [VampireEaseHands[V]]);
 end;
 

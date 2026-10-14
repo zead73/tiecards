@@ -124,9 +124,9 @@ begin
   if ADuel.Campaign.Ease <> 0 then
   begin
     if not Result.Eased then
-      Result.CrossText := 'Silver cross claimed: he is weakened from the next hand'
+      Result.CrossText := 'Silver cross claimed: the vampire is weakened from the next hand'
     else if ADuel.Campaign.Ease < 0 then
-      Result.CrossText := 'Weakened by the silver cross until he falls'
+      Result.CrossText := 'Weakened by the silver cross until the duel ends'
     else if ADuel.Campaign.Ease = 1 then
       Result.CrossText := 'Weakened by the silver cross: this is the last hand'
     else

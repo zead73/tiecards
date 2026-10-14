@@ -125,6 +125,13 @@ Ideas to review later.
       exempt. Tell the tablet player to use Share > Add to Home Screen.
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
+## Pronoun fix (2026-10-14)
+
+- [x] Lines shown for every vampire no longer say "he" or "his": `lost.conceded` and
+      `premise.5` in `story.ini`, the silver-cross panel text and claim message, and the
+      Rules text now say "the vampire". Lines inside one vampire's own section may use his
+      or her pronouns. Any new shared line (scenes, panel, messages) must stay neutral.
+
 ## Rules page and README (2026-10-14)
 
 - [x] **Rules button on the start menu.** `src/rules.pas` holds the player's rules as

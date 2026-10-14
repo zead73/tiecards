@@ -1485,7 +1485,7 @@ begin
       Inf := GetDuelInfo(DS, St);
       Check(Inf.Eased and (Inf.StockCards = VampireStockCards[0]) and Inf.WrapRanks and (Inf.HazardText = ''),
         'and the panel says so');
-      Check(Pos('until he falls', Inf.CrossText) > 0, 'until he falls: ' + Inf.CrossText);
+      Check(Pos('until the duel ends', Inf.CrossText) > 0, 'until the duel ends: ' + Inf.CrossText);
       Check(Inf.PerWin = VampireWinCoins[1], 'the pay stays hers');
       WinHand(DS);
       DS.SceneDone;
