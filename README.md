@@ -129,5 +129,6 @@ rebuild. The player's rules are separate, in `src/rules.pas`.
 
 ## License
 
-MIT, see [`LICENSE`](LICENSE). The card faces start from a CC0 set by MrEliptik
-(see [Art](#art)); the shipped pictures are derived from it.
+MIT, see [`LICENSE`](LICENSE). The card faces are derived from a CC0 set by
+MrEliptik (credits in [`assets/cards_src/CREDITS.txt`](assets/cards_src/CREDITS.txt));
+the other pictures are drawn by the scripts in `tools/`.
