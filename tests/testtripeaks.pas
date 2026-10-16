@@ -652,7 +652,7 @@ begin
           G.GetState(A);
           Inc(Moves);
           if (A.BreakStart = 1) and (A.BreakLeft = 0) then Inc(Breaks);
-          if A.FeedSkip and (A.WasteCount - 1 - A.Plays > FeedEvery) then Inc(Skips);
+          if A.FeedOnce and (A.WasteCount - 1 - A.Plays > FeedEvery) then Inc(Skips);
           if not G2.SetState(A) then
           begin
             Inc(Rejected);
@@ -676,7 +676,7 @@ begin
   end;
   Check(Rejected = 0, 'every real hand with relic rules was accepted (' + IntToStr(Rejected) + ' of ' + IntToStr(Moves) + ' refused)');
   Check(Breaks > 50, 'enough hands used the Pick (' + IntToStr(Breaks) + ')');
-  Check(Skips > 50, 'enough hands went past the Spoon''s skipped feeding (' + IntToStr(Skips) + ')');
+  Check(Skips > 50, 'enough hands went on past the Spoon''s one feeding (' + IntToStr(Skips) + ')');
 end;
 
 procedure TestSpoon;
@@ -695,23 +695,24 @@ begin
     Check(not G.LastMoveAte, 'three draws: nothing eaten');
     G.DrawStock;
     Check(G.LastMoveAte, 'the 4th draw: he feeds');
-    { with it, the first feeding is skipped; the next is the 8th draw }
+    { with it he feeds once: the 4th draw, and never again }
     G.Deal(BuildDeck(Ranks, 3, 7));
     G.SetHazard(hzHunger);
     G.SetRelicRules(True, 0);
-    for N := 1 to 4 do G.DrawStock;
-    Check(not G.LastMoveAte and (G.StockCount = 23 - 4), 'with the Spoon the 4th draw eats nothing');
-    for N := 5 to 7 do G.DrawStock;
-    Check(not G.LastMoveAte, 'nor the 5th to 7th');
+    for N := 1 to 3 do G.DrawStock;
+    Check(not G.LastMoveAte, 'with the Spoon the first three draws eat nothing');
     G.DrawStock;
-    Check(G.LastMoveAte, 'the 8th draw is the first feeding');
-    Check(G.Undo and not G.LastMoveAte, 'undo gives the eaten card back');
-    { only the first is skipped: 12th feeds, too }
+    Check(G.LastMoveAte and (G.StockCount = 23 - 4 - 1), 'the 4th draw: his one feeding');
+    for N := 5 to 11 do G.DrawStock;
+    Check(not G.LastMoveAte, 'the 5th to 11th: nothing');
     G.DrawStock;
-    for N := 9 to 11 do G.DrawStock;
-    Check(not G.LastMoveAte, 'the 9th to 11th: nothing');
-    G.DrawStock;
-    Check(G.LastMoveAte, 'and the 12th');
+    Check(not G.LastMoveAte, 'the 12th, where he would have fed again: nothing');
+    for N := 13 to 20 do G.DrawStock;
+    Check(not G.LastMoveAte, 'and never again');
+    Check(G.Undo and G.Undo, 'undo two draws');
+    { undoing back past the feeding gives the card back }
+    while G.CanUndo do G.Undo;
+    Check(G.StockCount = 23, 'undone to the start: every stock card is back, the eaten one too');
   finally
     G.Free;
   end;
@@ -898,7 +899,7 @@ begin
     and (A.Streak = B.Streak) and (A.BestStreak = B.BestStreak) and (A.Plays = B.Plays)
     and (Length(A.Stock) = Length(B.Stock)) and CardsEqual(A.WasteTop, B.WasteTop)
     and (Length(A.History) = Length(B.History)) and (A.Hazard = B.Hazard)
-    and (A.FeedSkip = B.FeedSkip) and (A.BreakStart = B.BreakStart) and (A.BreakLeft = B.BreakLeft);
+    and (A.FeedOnce = B.FeedOnce) and (A.BreakStart = B.BreakStart) and (A.BreakLeft = B.BreakLeft);
   if not Result then Exit;
   for I := 0 to TableauSize - 1 do
     if not CardsEqual(A.Tableau[I], B.Tableau[I]) or (A.Removed[I] <> B.Removed[I]) or (A.Marks[I] <> B.Marks[I]) then

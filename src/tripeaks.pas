@@ -71,7 +71,7 @@ type
     History: TUndoArray;                { the moves since the deal or the last special card }
     Hazard: Integer;                    { Ord(THazard) }
     Marks: TMarkArray;
-    FeedSkip: Boolean;                  { the Iron Spoon: his first feeding is skipped }
+    FeedOnce: Boolean;                  { the Iron Spoon: he feeds at most once in the hand }
     BreakStart, BreakLeft: Integer;     { the Locksmith's Pick: breaks the hand began with (0 or 1), and still unused }
   end;
 
@@ -98,7 +98,7 @@ type
     FSpare: TCardArray;
     FRevealed: Boolean;
     FStakes: Integer;
-    FFeedSkip: Boolean;
+    FFeedOnce: Boolean;
     FBreakStart, FBreakLeft: Integer;
     procedure RecordMove(ADraw: Boolean; AIndex: Integer; AMissed: Boolean; ABitten: Boolean = False);
     procedure ForgetUndo;
@@ -151,10 +151,10 @@ type
     function IsLocked(I: Integer): Boolean;       { chained, with a neighbour still on the table, and no break left to spend }
     function IsLockedStrict(I: Integer): Boolean; { chained, with a neighbour still on the table (the plain rule) }
     { Relics that change the rules of the hand just dealt (call before the first
-      move): the Iron Spoon skips his first feeding, and the Locksmith's Pick gives
+      move): the Iron Spoon lets him feed at most once, and the Locksmith's Pick gives
       ABreaks (0 or 1) chained cards that may be played anyway. }
-    procedure SetRelicRules(AFeedSkip: Boolean; ABreaks: Integer);
-    property FeedSkipped: Boolean read FFeedSkip;
+    procedure SetRelicRules(AFeedOnce: Boolean; ABreaks: Integer);
+    property FeedsOnce: Boolean read FFeedOnce;
     property BreaksLeft: Integer read FBreakLeft;
     property BreaksAtStart: Integer read FBreakStart;
     property Hazard: THazard read FHazard;
@@ -302,7 +302,7 @@ begin
   FRevealed := False;
   SetLength(FHistory, 0);                   { nothing of the last hand's undo lingers }
   FHazard := hzNone;
-  FFeedSkip := False;
+  FFeedOnce := False;
   FBreakStart := 0;
   FBreakLeft := 0;
   for I := 0 to TableauSize - 1 do FMarks[I] := MarkNone;
@@ -446,9 +446,9 @@ begin
     if (FMarks[I] = Kind) and not FRemoved[I] then Exit(True);
 end;
 
-procedure TTriPeaksGame.SetRelicRules(AFeedSkip: Boolean; ABreaks: Integer);
+procedure TTriPeaksGame.SetRelicRules(AFeedOnce: Boolean; ABreaks: Integer);
 begin
-  FFeedSkip := AFeedSkip;
+  FFeedOnce := AFeedOnce;
   if ABreaks < 0 then ABreaks := 0;
   if ABreaks > 1 then ABreaks := 1;
   FBreakStart := ABreaks;
@@ -566,7 +566,7 @@ begin
   { hunger: after every FeedEvery-th draw he eats the bottom card of the stock }
   if (FHazard = hzHunger) and (Length(FStock) > 0)
     and ((FWasteCount - 1 - FPlays) mod FeedEvery = 0)
-    and not (FFeedSkip and (FWasteCount - 1 - FPlays = FeedEvery)) then       { the Spoon: not the first time }
+    and not (FFeedOnce and (FWasteCount - 1 - FPlays > FeedEvery)) then       { the Spoon: only the first feeding }
   begin
     EatCard;
     FHistory[High(FHistory)].Ate := True;
@@ -755,7 +755,7 @@ begin
   D.History := Copy(FHistory);
   D.Hazard := Ord(FHazard);
   for I := 0 to TableauSize - 1 do D.Marks[I] := FMarks[I];
-  D.FeedSkip := FFeedSkip;
+  D.FeedOnce := FFeedOnce;
   D.BreakStart := FBreakStart;
   D.BreakLeft := FBreakLeft;
 end;
@@ -944,7 +944,7 @@ begin
   FHistory := Copy(D.History);
   FHazard := THazard(D.Hazard);
   for I := 0 to TableauSize - 1 do FMarks[I] := D.Marks[I];
-  FFeedSkip := D.FeedSkip;
+  FFeedOnce := D.FeedOnce;
   FBreakStart := D.BreakStart;
   FBreakLeft := D.BreakLeft;
 end;

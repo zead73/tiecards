@@ -8,7 +8,7 @@ unit Relics;
     Garlic Wreath      the first bitten card you play in a hand costs no coins
     Locksmith's Pick   one chained card in a hand can be played even with its
                        neighbour still on the table
-    Iron Spoon         the Count skips his first feeding in a hand
+    Iron Spoon         the Count feeds at most once in a hand
     Steady Locket      your first missed move in a hand costs no coins
     Moonstone          the first Show move in a hand uses no hint card
 

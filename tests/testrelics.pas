@@ -1,7 +1,7 @@
 program testrelics;
 
 { Relics: what each one does to a hand, how it is paid for and saved, and the
-  rules that keep it fair (one break, one skipped feeding, one free hint, one
+  rules that keep it fair (one break, one feeding at most, one free hint, one
   forgiven bite or miss, all undone and saved with the hand). }
 
 {$mode objfpc}{$H+}
@@ -227,10 +227,10 @@ begin
   try
     S.Relics := RelicBit(rlPick) or RelicBit(rlSpoon);
     S.NewGame;
-    Check((S.Game.BreaksAtStart = 1) and S.Game.FeedSkipped, 'the Pick and the Spoon reach the game''s rules');
+    Check((S.Game.BreaksAtStart = 1) and S.Game.FeedsOnce, 'the Pick and the Spoon reach the game''s rules');
     S.ExportHand(H);
-    Check(H.Game.FeedSkip and (H.Game.BreakStart = 1), 'and the saved hand');
-    Check(S2.ImportHand(H) and (S2.Game.BreaksAtStart = 1) and S2.Game.FeedSkipped, 'which loads back with them');
+    Check(H.Game.FeedOnce and (H.Game.BreakStart = 1), 'and the saved hand');
+    Check(S2.ImportHand(H) and (S2.Game.BreaksAtStart = 1) and S2.Game.FeedsOnce, 'which loads back with them');
     H.Relics := 0;
     Check(not S2.ImportHand(H), 'a hand whose rules do not match its relics is refused');
     S.ExportHand(H);
@@ -238,7 +238,7 @@ begin
     Check(not S2.ImportHand(H), 'and so is an impossible relic set');
     S.Relics := 0;
     S.NewGame;
-    Check((S.Game.BreaksAtStart = 0) and not S.Game.FeedSkipped, 'no relics: the plain rules');
+    Check((S.Game.BreaksAtStart = 0) and not S.Game.FeedsOnce, 'no relics: the plain rules');
   finally
     S.Free;
     S2.Free;
@@ -275,10 +275,10 @@ begin
     { an old save has none of them }
     DeleteLine(Text, 'relics');
     DeleteLine(Text, 'freehint');
-    DeleteLine(Text, 'feedskip');
+    DeleteLine(Text, 'feedonce');
     DeleteLine(Text, 'breaks');
     Check(Pos('relics=', Text) = 0, 'test set-up: the lines are gone');
-    Check(TextToHand(Text, H2, Stamp) and (H2.Relics = 0) and not H2.FreeHintUsed and (H2.Game.BreakStart = 0) and not H2.Game.FeedSkip,
+    Check(TextToHand(Text, H2, Stamp) and (H2.Relics = 0) and not H2.FreeHintUsed and (H2.Game.BreakStart = 0) and not H2.Game.FeedOnce,
       'a save without them loads with no relics');
   finally
     S.Free;

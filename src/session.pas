@@ -318,7 +318,7 @@ end;
 function TGameSession.ImportHand(const H: TSavedHand): Boolean;
 begin
   Result := (H.Misses >= 0) and (H.Bites >= 0) and ValidRelicMask(H.Relics)
-    and (H.Game.FeedSkip = HasRelic(H.Relics, rlSpoon))               { the game's rules agree with its relics }
+    and (H.Game.FeedOnce = HasRelic(H.Relics, rlSpoon))               { the game's rules agree with its relics }
     and ((H.Game.BreakStart = 1) = HasRelic(H.Relics, rlPick))
     and FGame.SetState(H.Game);
   if not Result then Exit;

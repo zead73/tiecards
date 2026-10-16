@@ -262,7 +262,7 @@ begin
     L.Add('marks=' + MarksToStr(H.Game.Marks));
     L.Add('relics=' + IntToStr(H.Relics));
     if H.FreeHintUsed then L.Add('freehint=1') else L.Add('freehint=0');
-    if H.Game.FeedSkip then L.Add('feedskip=1') else L.Add('feedskip=0');
+    if H.Game.FeedOnce then L.Add('feedonce=1') else L.Add('feedonce=0');
     L.Add(Format('breaks=%d %d', [H.Game.BreakStart, H.Game.BreakLeft]));
     L.Add('undo=' + MovesToStr(H.Game.History));
     Result := L.Text;
@@ -374,7 +374,7 @@ begin
     { relics: a save from before them has none of these lines }
     H.Relics := 0;
     H.FreeHintUsed := False;
-    H.Game.FeedSkip := False;
+    H.Game.FeedOnce := False;
     H.Game.BreakStart := 0;
     H.Game.BreakLeft := 0;
     if L.IndexOfName('relics') >= 0 then
@@ -385,11 +385,11 @@ begin
       if (S <> '0') and (S <> '1') then Exit;
       H.FreeHintUsed := S = '1';
     end;
-    if L.IndexOfName('feedskip') >= 0 then
+    if L.IndexOfName('feedonce') >= 0 then
     begin
-      S := L.Values['feedskip'];
+      S := L.Values['feedonce'];
       if (S <> '0') and (S <> '1') then Exit;
-      H.Game.FeedSkip := S = '1';
+      H.Game.FeedOnce := S = '1';
     end;
     if L.IndexOfName('breaks') >= 0 then
       if not ParseInts(L.Values['breaks'], 2, Nums) then Exit
