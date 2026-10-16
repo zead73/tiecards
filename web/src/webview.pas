@@ -1540,7 +1540,8 @@ begin
         FCtx.drawImage(ImageOf('special_' + ArtKey[Row.Art]), R.Left + 6, R.Top + 4, IconW, IconH);
       X := R.Left + 6 + IconW + 10 * K;
     end;
-    if Row.ButtonText <> '' then TextR := Rect(Round(X), R.Top, B.Left - 70, R.Bottom)
+    if Row.Button2Text <> '' then TextR := Rect(Round(X), R.Top, FCtl.OverlayButton2Rect(I).Left - 12, R.Bottom)
+    else if Row.ButtonText <> '' then TextR := Rect(Round(X), R.Top, B.Left - 70, R.Bottom)
     else if Row.Aside = '' then TextR := Rect(Round(X), R.Top, R.Right - 12, R.Bottom)
     else TextR := Rect(Round(X), R.Top, R.Right - 150, R.Bottom);
     if R.Bottom - R.Top >= 28 then
@@ -1588,6 +1589,20 @@ begin
       SetFont(Max(14, 13 * K), True, False);
       if Row.ButtonEnabled then FillColor(30, 19, 38) else FillColor(110, 98, 84);
       S := Row.ButtonText;
+      Text(S, B.Left + ((B.Right - B.Left) - TextW(S)) / 2, B.Top + ((B.Bottom - B.Top) - Max(14, 13 * K)) / 2 - 2);
+    end;
+    { the second, smaller button (Delete on a saved game) }
+    if Row.Button2Text <> '' then
+    begin
+      B := FCtl.OverlayButton2Rect(I);
+      FillColor(46, 30, 56);
+      if Row.Button2Enabled then StrokeColor(196, 60, 76) else StrokeColor(70, 58, 44);
+      RRect(B.Left, B.Top, B.Right - B.Left, B.Bottom - B.Top, 8 * K);
+      FCtx.fill;
+      FCtx.stroke;
+      SetFont(Max(14, 13 * K), True, False);
+      if Row.Button2Enabled then FillColor(232, 224, 204) else FillColor(110, 98, 84);
+      S := Row.Button2Text;
       Text(S, B.Left + ((B.Right - B.Left) - TextW(S)) / 2, B.Top + ((B.Bottom - B.Top) - Max(14, 13 * K)) / 2 - 2);
     end;
   end;

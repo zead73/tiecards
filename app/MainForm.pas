@@ -174,7 +174,7 @@ begin
   btnRecords.Caption := UI.RecordsCaption;
   btnRecords.Enabled := UI.RecordsEnabled;
   { a record was broken: ask for initials, but not from inside a repaint }
-  if (UI.AskInitials or UI.AskCross or UI.ShowRules) and not FAsking then
+  if (UI.AskInitials or UI.AskCross or UI.ShowRules or UI.AskDelete) and not FAsking then
   begin
     FAsking := True;
     FAskTimer.Enabled := True;
@@ -200,6 +200,13 @@ begin
     ShowRulesDialog;
     FCtl.ActionRulesClosed;
   end
+  else if UI.AskDelete then
+  begin
+    { Keep is the default (and Esc / closing the window): nothing is deleted by accident }
+    R := QuestionDlg('Delete saved game', UI.DeletePrompt, mtWarning,
+      [mrNo, 'Keep it', 'IsDefault', 'IsCancel', mrYes, 'Delete it'], 0);
+    FCtl.ActionAnswerDelete(R = mrYes);
+  end
   else if UI.AskCross then
   begin
     { Keep is the default (and Esc / closing the window): nothing is destroyed by accident }
@@ -215,7 +222,7 @@ begin
   end;
   FAsking := False;
   { in case another record was broken meanwhile }
-  if FCtl.GetUi.AskInitials or FCtl.GetUi.AskCross or FCtl.GetUi.ShowRules then
+  if FCtl.GetUi.AskInitials or FCtl.GetUi.AskCross or FCtl.GetUi.ShowRules or FCtl.GetUi.AskDelete then
   begin
     FAsking := True;
     FAskTimer.Enabled := True;

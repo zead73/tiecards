@@ -188,6 +188,7 @@ begin
     'The game saves your hand after every move, and your coins and cards as soon as they change. Close it at any time: next time it opens where you left off.' + RulesBreak +
     Format('The Menu button opens the start menu. From there you can Save game or Load game into one of %d slots for each mode. ', [SlotCount]) +
     'Loading a Campaign slot takes your campaign back to that moment, including your coins and cards.' + RulesBreak +
+    'To clear out a saved game, press the Delete button beside it on the Save or Load page. The game asks first, because a deleted save cannot be brought back.' + RulesBreak +
     'Start over lets you restart the Campaign only, or erase everything.';
 end;
 

@@ -243,7 +243,8 @@ begin
         C.Draw(IconR.Left, IconR.Top, Icon(Row.Art, IconH));
       X := IconR.Right + Round(10 * K);
     end;
-    if Row.ButtonText <> '' then TW := B.Left - 70
+    if Row.Button2Text <> '' then TW := Ctl.OverlayButton2Rect(I).Left - 12
+    else if Row.ButtonText <> '' then TW := B.Left - 70
     else if Row.Aside = '' then TW := R.Right - 12
     else TW := R.Right - 150;
     C.Font.Style := [fsBold];
@@ -292,6 +293,22 @@ begin
       C.Font.Size := Max(9, Round(12 * K));
       C.Font.Style := [fsBold];
       S := Row.ButtonText;
+      C.TextOut(B.Left + ((B.Right - B.Left) - C.TextWidth(S)) div 2,
+        B.Top + ((B.Bottom - B.Top) - C.TextHeight(S)) div 2, S);
+    end;
+    { the second, smaller button (Delete on a saved game) }
+    if Row.Button2Text <> '' then
+    begin
+      B := Ctl.OverlayButton2Rect(I);
+      C.Brush.Style := bsSolid;
+      C.Brush.Color := RGBToColor(46, 30, 56);
+      if Row.Button2Enabled then C.Pen.Color := RGBToColor(196, 60, 76) else C.Pen.Color := RGBToColor(70, 58, 44);
+      C.RoundRect(B.Left, B.Top, B.Right, B.Bottom, Round(8 * K), Round(8 * K));
+      C.Brush.Style := bsClear;
+      C.Font.Size := Max(9, Round(12 * K));
+      C.Font.Style := [fsBold];
+      if Row.Button2Enabled then C.Font.Color := Bone else C.Font.Color := RGBToColor(110, 98, 84);
+      S := Row.Button2Text;
       C.TextOut(B.Left + ((B.Right - B.Left) - C.TextWidth(S)) div 2,
         B.Top + ((B.Bottom - B.Top) - C.TextHeight(S)) div 2, S);
     end;

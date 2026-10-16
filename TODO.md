@@ -126,6 +126,14 @@ Ideas to review later.
       `web/README.md` (2026-10-16).
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
+## Delete saved games (2026-10-16)
+
+- [x] A Delete button beside every used slot on the Save and Load pages (Free Play and
+      Campaign slots). It asks first (`UiState.AskDelete` / `ActionAnswerDelete`; QuestionDlg
+      on the desktop, `dlgDelete` on the web; Keep is the default and Esc keeps it). Rows got a
+      second button (`Button2Text`, `OverlayButton2Rect`). The automatic hand saves and your
+      coins are not touched (Start over does those). Tests: `TestDeleteSaves`.
+
 ## Trophies (2026-10-16)
 
 - [x] **Trophies, built from the user's design.** Six, all deterministic: first win, perfect

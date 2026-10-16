@@ -75,6 +75,10 @@ type
     { The Rules button was pressed: the front end shows the rules (RulesSectionCount,
       RulesHeading, RulesBody) and calls ActionRulesClosed when they are dismissed. }
     ShowRules: Boolean;
+    { Delete was pressed on a saved game: the front end should ask (DeletePrompt) and
+      call ActionAnswerDelete(True) to delete it or (False) to keep it. }
+    AskDelete: Boolean;
+    DeletePrompt: string;
   end;
 
   { The Store (Fenwick's goods) and the tray of your own special cards are two
@@ -89,6 +93,8 @@ type
     Art: Integer;                   { 0..5 = Ord(TSpecialKind), 6 = undo cards, 7 = hint cards, -1 = none }
     Selected: Boolean;
     Header: Boolean;                { a section heading, not a row }
+    Button2Text: string;            { a second, smaller button to the left of the first (a saved game's Delete) }
+    Button2Enabled: Boolean;
   end;
 
 const
@@ -128,6 +134,7 @@ type
     FToast: string;
     FTrophies: TTrophies;
     FNews: string;             { 'Trophy earned: ...' until the next tap on the table }
+    FDeleteAsk: Integer;       { the slot row whose Delete is waiting for an answer (-1 = none) }
     FRulesShow: Boolean;       { the rules are being shown (by the front end) }
     FCrossAsk: Integer;        { the silver cross card a tap is waiting to destroy (-1 = none) }
     FOnChange: TChangeEvent;
@@ -153,6 +160,7 @@ type
     FOffX, FOffY: Integer;
     procedure Changed;
     procedure EarnTrophy(T: TTrophy);
+    function DeleteText: string;
     procedure SessionWon(BestStreak, Misses: Integer);
     procedure DuelWon(V, TotalLost, BestStreak, Misses: Integer; Kill: Boolean);
     function NeedInitials: Boolean;
@@ -297,6 +305,7 @@ type
     function TrophyLayout: TTrophyLayout;      { the shelf's rectangles (empty with no panel) }
     function TrophyArt(I: Integer): Integer;   { the picture slot to draw for shelf slot I }
     procedure ActionOpenTrophies;
+    procedure ActionAnswerDelete(ADelete: Boolean);      { the question in UiState.AskDelete }
     procedure ActionRulesClosed;                         { the rules shown for UiState.ShowRules were dismissed }
     function RulesSectionCount: Integer;
     function RulesHeading(I: Integer): string;
@@ -322,6 +331,7 @@ type
     function OverlaySpeechRect: TRect;
     function OverlayRowRect(I: Integer): TRect;
     function OverlayButtonRect(I: Integer): TRect;
+    function OverlayButton2Rect(I: Integer): TRect;   { the second button, left of the first }
     function OverlayLeaveRect: TRect;
     function OverlayFooterRect: TRect;
     { Drawing the table: is this card shown face up (free, or Seer's eye)? is it
@@ -351,6 +361,7 @@ begin
   inherited Create;
   FStory := AStory;
   FCrossAsk := -1;
+  FDeleteAsk := -1;
   FStage := TStage.Create;
   FSession := TGameSession.Create(DefaultInventoryFile);
   FGame := FSession.Game;
@@ -633,6 +644,8 @@ begin
   Result.Aside := '';
   Result.ButtonText := '';
   Result.ButtonEnabled := False;
+  Result.Button2Text := '';
+  Result.Button2Enabled := False;
   Result.Art := -1;
   Result.Selected := False;
   Result.Header := False;
@@ -659,6 +672,8 @@ begin
       if V < VampireCount then Name := FStory.Name(V) else Name := 'Campaign complete';
       Result.Detail := Format('%s, %d of %d wins   %d cards left   saved %s',
         [Name, CI.Wins, WinsToKill, CI.CardsLeft, CI.Stamp]);
+      Result.Button2Text := 'Delete';
+      Result.Button2Enabled := True;
     end
     else
       Result.Detail := 'Empty';
@@ -678,7 +693,11 @@ begin
   begin
     FI := PeekHandFile(SlotFile(N));
     if FI.Exists then
-      Result.Detail := Format('%d cards left   saved %s', [FI.CardsLeft, FI.Stamp])
+    begin
+      Result.Detail := Format('%d cards left   saved %s', [FI.CardsLeft, FI.Stamp]);
+      Result.Button2Text := 'Delete';
+      Result.Button2Enabled := True;
+    end
     else
       Result.Detail := 'Empty';
     if FSlotsSave then
@@ -1056,6 +1075,8 @@ begin
   Result.InitialsPrompt := PendingText;
   Result.InitialsDefault := FRecords.LastInitials;
   Result.ShowRules := FRulesShow;
+  Result.AskDelete := FDeleteAsk >= 0;
+  Result.DeletePrompt := DeleteText;
   Result.AskCross := FCrossAsk >= 0;
   Result.CrossPrompt := 'This card carries the silver cross. Playing it as an ordinary card destroys the cross: only a Wild card can claim it. Play it anyway?';
   Result.SaveEnabled := not FCampaignMode and not Animating and not FGame.IsWon;
@@ -1489,7 +1510,7 @@ end;
 
 procedure TGameController.KeyPress(IsEscape: Boolean);
 begin
-  if FRulesShow then Exit;
+  if FRulesShow or (FDeleteAsk >= 0) then Exit;
   if FMenuOpen and (FOverlay = okSlots) then
   begin
     if IsEscape then ActionCloseOverlay;     { back to the menu }
@@ -1542,7 +1563,7 @@ var
   I: Integer;
   P: TPoint;
 begin
-  if (FCrossAsk >= 0) or FRulesShow then Exit;   { a question or the rules have to be dealt with first }
+  if (FCrossAsk >= 0) or (FDeleteAsk >= 0) or FRulesShow then Exit;   { a question or the rules have to be dealt with first }
   if FOverlay <> okNone then                 { the slot screen sits over the menu too }
   begin
     TapOverlay(X, Y);
@@ -1693,6 +1714,7 @@ begin
   FTargeting := False;
   FSelected := -1;
   FCrossAsk := -1;
+  FDeleteAsk := -1;
 end;
 
 function TGameController.IntroActive: Boolean;
@@ -1864,6 +1886,8 @@ begin
   Result.Aside := '';
   Result.ButtonText := '';
   Result.ButtonEnabled := False;
+  Result.Button2Text := '';
+  Result.Button2Enabled := False;
   Result.Art := I;
   Result.Selected := (FOverlay = okStore) and (I = FSelected);
   Result.Header := False;
@@ -2106,6 +2130,15 @@ begin
   Result := Rect(L.X0, L.RowsTop + I * L.RowH, L.X1, L.RowsTop + (I + 1) * L.RowH - 4);
 end;
 
+function TGameController.OverlayButton2Rect(I: Integer): TRect;
+var
+  B: TRect;
+begin
+  B := OverlayButtonRect(I);
+  Result := B;
+  OffsetRect(Result, -((B.Right - B.Left) + 8), 0);
+end;
+
 function TGameController.OverlayButtonRect(I: Integer): TRect;
 var
   R: TRect;
@@ -2218,6 +2251,17 @@ begin
     AdvanceIntro;
     Exit;
   end;
+  if FOverlay = okSlots then
+    for I := 0 to OverlayRowCount - 1 do
+      if PtInRect(OverlayButton2Rect(I), P) and (OverlayRow(I).Button2Text <> '') then
+      begin
+        if OverlayRow(I).Button2Enabled then
+        begin
+          FDeleteAsk := I;                 { ask first: a deleted save cannot be brought back }
+          Changed;
+        end;
+        Exit;
+      end;
   for I := 0 to OverlayRowCount - 1 do
     if PtInRect(OverlayButtonRect(I), P) then
     begin
@@ -2379,6 +2423,35 @@ begin
   Changed;
 end;
 
+{ What the delete question says: which saved game and what is in it. }
+function TGameController.DeleteText: string;
+var
+  Camp: Boolean;
+  N: Integer;
+begin
+  Result := '';
+  if (FDeleteAsk < 0) or not SlotRowInfo(FDeleteAsk, Camp, N) then Exit;
+  if Camp then Result := 'Delete the saved Campaign in slot ' + IntToStr(N)
+  else Result := 'Delete the saved Free Play hand in slot ' + IntToStr(N);
+  Result := Result + ' (' + OverlayRow(FDeleteAsk).Detail + ')? It cannot be brought back.';
+end;
+
+procedure TGameController.ActionAnswerDelete(ADelete: Boolean);
+var
+  I, N: Integer;
+  Camp: Boolean;
+begin
+  I := FDeleteAsk;
+  if I < 0 then Exit;
+  FDeleteAsk := -1;
+  if ADelete and (FOverlay = okSlots) and SlotRowInfo(I, Camp, N) then
+  begin
+    if Camp then DeleteCampaignSlot(N) else StoreDelete(SlotFile(N));
+    FToast := Format('Deleted slot %d.', [N]);
+  end;
+  Changed;
+end;
+
 procedure TGameController.ActionRulesClosed;
 begin
   FRulesShow := False;
@@ -2447,6 +2520,8 @@ begin
   Result.Aside := '';
   Result.ButtonText := '';
   Result.ButtonEnabled := False;
+  Result.Button2Text := '';
+  Result.Button2Enabled := False;
   Result.Art := -1;
   Result.Selected := False;
   Result.Header := False;

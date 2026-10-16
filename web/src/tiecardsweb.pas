@@ -30,6 +30,7 @@ type
     FAudioUnlocked: Boolean;
     FAskingInitials: Boolean;
     FAskingCross: Boolean;
+    FAskingDelete: Boolean;
     FShowingRules: Boolean;
     function El(const Id: string): TJSElement;
     procedure SetText(const Id, Value: string);
@@ -59,6 +60,9 @@ type
     function OnCrossKeep(Event: TEventListenerEvent): Boolean;
     function OnCrossPlay(Event: TEventListenerEvent): Boolean;
     procedure AnswerCross(APlayIt: Boolean);
+    procedure AnswerDelete(ADelete: Boolean);
+    function OnDeleteKeep(Event: TEventListenerEvent): Boolean;
+    function OnDeleteGo(Event: TEventListenerEvent): Boolean;
     procedure CloseRules;
     function OnRulesClose(Event: TEventListenerEvent): Boolean;
     procedure FillRules;
@@ -180,6 +184,16 @@ begin
       if (rc) { rc.focus(); }
     end;
   end;
+  if U.AskDelete and not FAskingDelete then
+  begin
+    FAskingDelete := True;
+    SetText('deletePrompt', U.DeletePrompt);
+    Show('dlgDelete', True);
+    asm
+      var kb = document.getElementById('deleteKeep');
+      if (kb) { kb.focus(); }
+    end;
+  end;
   if U.AskCross and not FAskingCross then
   begin
     FAskingCross := True;
@@ -296,6 +310,12 @@ begin
   begin
     if string(TJSObject(Event)['key']) = 'Escape' then CloseRules;
     Result := string(TJSObject(Event)['key']) = 'Escape';
+    Exit;
+  end;
+  if FAskingDelete then                    { delete a saved game: Esc = keep it }
+  begin
+    if string(TJSObject(Event)['key']) = 'Escape' then AnswerDelete(False);
+    Result := string(TJSObject(Event)['key']) <> 'Enter';
     Exit;
   end;
   if FAskingCross then                     { the silver cross question: Esc = keep it }
@@ -437,6 +457,26 @@ begin
   Result := True;
 end;
 
+{ Deleting a saved game: Delete it, or Keep it. }
+procedure TWebApp.AnswerDelete(ADelete: Boolean);
+begin
+  Show('dlgDelete', False);
+  FAskingDelete := False;
+  FCtl.ActionAnswerDelete(ADelete);
+end;
+
+function TWebApp.OnDeleteKeep(Event: TEventListenerEvent): Boolean;
+begin
+  AnswerDelete(False);
+  Result := True;
+end;
+
+function TWebApp.OnDeleteGo(Event: TEventListenerEvent): Boolean;
+begin
+  AnswerDelete(True);
+  Result := True;
+end;
+
 { The silver cross question: Play it anyway, or Keep the cross. }
 procedure TWebApp.AnswerCross(APlayIt: Boolean);
 begin
@@ -540,6 +580,8 @@ begin
   Listen('btnCancel', 'click', @OnCancel);
   Listen('btnRecords', 'click', @OnRecords);
   Listen('rulesClose', 'click', @OnRulesClose);
+  Listen('deleteKeep', 'click', @OnDeleteKeep);
+  Listen('deleteGo', 'click', @OnDeleteGo);
   Listen('crossKeep', 'click', @OnCrossKeep);
   Listen('crossPlay', 'click', @OnCrossPlay);
   Listen('initialsOk', 'click', @OnInitialsOk);

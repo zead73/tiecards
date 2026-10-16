@@ -1414,6 +1414,95 @@ begin
   end;
 end;
 
+{ Deleting a saved game from the Save / Load pages (asks first). }
+procedure TapSlotDelete(C: TGameController; I: Integer);
+var
+  R: TRect;
+begin
+  R := C.OverlayButton2Rect(I);
+  C.Tap((R.Left + R.Right) div 2, (R.Top + R.Bottom) div 2);
+end;
+
+procedure TestDeleteSaves;
+var
+  St: TStory;
+  C: TGameController;
+  D: TDecks;
+  W: TWatcher;
+begin
+  WipeStore;
+  St := TStory.Create;
+  St.LoadFromFile(StoryPath);
+  D := TDecks.Create;
+  W := TWatcher.Create;
+  C := NewCtl(St, D, W);
+  try
+    C.StartWithMenu;
+    TapMenuButton(C, 1);
+    RunOut(C);
+    TapCard(C, 27);
+    C.ActionSaveSlot(1);
+    C.ActionSaveSlot(3);
+    C.ActionOpenMenu;
+    TapMenuButton(C, 3);
+    Check(C.Overlay = okSlots, 'the Load page');
+    Check((C.OverlayRow(1).Button2Text = 'Delete') and C.OverlayRow(1).Button2Enabled, 'a saved slot has a Delete button');
+    Check((C.OverlayRow(2).Button2Text = '') and not C.OverlayRow(2).Button2Enabled, 'an empty one has none');
+    Check(C.OverlayButton2Rect(1).Right <= C.OverlayButtonRect(1).Left, 'beside the Load button, to its left');
+    Check(not C.GetUi.AskDelete, 'nothing is asked yet');
+
+    { ask, and answer no }
+    TapSlotDelete(C, 1);
+    Check(C.GetUi.AskDelete, 'Delete asks first');
+    Check((Pos('slot 1', C.GetUi.DeletePrompt) > 0) and (Pos('Free Play', C.GetUi.DeletePrompt) > 0), 'about this slot: ' + C.GetUi.DeletePrompt);
+    TapSlotButton(C, 3);
+    C.KeyPress(True);
+    Check(C.GetUi.AskDelete and (C.Overlay = okSlots) and C.SlotInfo(3).Exists, 'the page waits for the answer');
+    C.ActionAnswerDelete(False);
+    Check(not C.GetUi.AskDelete and C.SlotInfo(1).Exists, 'No: the save is kept');
+
+    { yes }
+    TapSlotDelete(C, 1);
+    C.ActionAnswerDelete(True);
+    Check(not C.SlotInfo(1).Exists, 'Yes: the save is gone');
+    Check(C.SlotInfo(3).Exists, 'the other slot is not touched');
+    Check((C.OverlayRow(1).Detail = 'Empty') and (C.OverlayRow(1).Button2Text = '') and not C.OverlayRow(1).ButtonEnabled,
+      'the row now says Empty, with nothing to load or delete');
+    Check(Pos('Deleted slot 1', C.GetUi.StatusText) > 0, 'and the status line says so: ' + C.GetUi.StatusText);
+    C.ActionAnswerDelete(True);
+    Check(C.SlotInfo(3).Exists, 'answering with no question pending does nothing');
+
+    { the Save page has it too }
+    C.KeyPress(True);
+    TapMenuButton(C, 2);
+    Check((C.OverlayRow(3).ButtonText = 'Replace') and (C.OverlayRow(3).Button2Text = 'Delete'), 'Replace and Delete on a used slot');
+    TapSlotDelete(C, 3);
+    C.ActionAnswerDelete(True);
+    Check(not C.SlotInfo(3).Exists, 'deleted from the Save page');
+    C.KeyPress(True);
+    C.KeyPress(True);
+
+    { a campaign save }
+    C.ActionToggleMode;
+    ClickThrough(C);
+    RunOut(C);
+    C.ActionOpenMenu;
+    TapMenuButton(C, 2);
+    TapSlotButton(C, 2);                         { save the campaign in its slot 2 }
+    Check(PeekCampaignSlot(2).Exists, 'test set-up: a campaign save');
+    C.KeyPress(True);
+    TapMenuButton(C, 3);
+    Check(C.OverlayRow(6).Button2Text = 'Delete', 'a saved campaign slot has Delete too');
+    TapSlotDelete(C, 6);
+    Check(Pos('Campaign', C.GetUi.DeletePrompt) > 0, 'asking about the campaign: ' + C.GetUi.DeletePrompt);
+    C.ActionAnswerDelete(True);
+    Check(not PeekCampaignSlot(2).Exists, 'the campaign save is gone');
+    Check((C.OverlayRow(6).Detail = 'Empty') and (C.OverlayRow(6).Button2Text = ''), 'and its row is empty');
+  finally
+    C.Free; W.Free; D.Free; St.Free;
+  end;
+end;
+
 procedure TestBiteStatus;
 var
   St: TStory;
@@ -1767,6 +1856,7 @@ begin
   TestStartOver;
   TestMenu;
   TestSaveSlots;
+  TestDeleteSaves;
   TestTrickControls;
   TestCrossControls;
   TestTrophies;
