@@ -125,6 +125,16 @@ Ideas to review later.
       exempt. Tell the tablet player to use Share > Add to Home Screen.
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
+## Linux icon (2026-10-16)
+
+- [x] The Linux window now sets its own icon (the .ico is embedded as `TIECARDS_ICO`,
+      loaded in `TfrmMain.FormCreate`; checked with `xprop _NET_WM_ICON`). The menu reads
+      only the .desktop file, so `tools/install-linux-launcher.sh` installs the icon
+      (`~/.local/share/icons/hicolor/256x256/apps/tiecards.png`, from `assets/icon/tiecards.png`)
+      and a `tiecards.desktop`; `--icon-only` for a hand-made entry. The user's own menu
+      entry was not found on disk (not in ~/.local/share/applications), so only the icon
+      was installed; the entry needs `Icon=tiecards`.
+
 ## Pronoun fix (2026-10-14)
 
 - [x] Lines shown for every vampire no longer say "he" or "his": `lost.conceded` and

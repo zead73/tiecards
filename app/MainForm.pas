@@ -110,6 +110,19 @@ begin
   finally
     RS.Free;
   end;
+  { the program's own icon, for the title bar and the task bar (Windows also has
+    it in the exe; Linux takes it from here) }
+  try
+    RS := TResourceStream.Create(HInstance, 'TIECARDS_ICO', RT_RCDATA);
+    try
+      Application.Icon.LoadFromStream(RS);
+    finally
+      RS.Free;
+    end;
+    Icon.Assign(Application.Icon);
+  except
+    { no icon is better than no game }
+  end;
   FCtl := TGameController.Create(FStory);
   FCtl.OnChange := @ControllerChanged;
   FCtl.SetViewport(pbTable.Width, pbTable.Height);

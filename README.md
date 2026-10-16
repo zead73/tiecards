@@ -70,7 +70,10 @@ You need Free Pascal 3.2.2 and Lazarus 4.8 with the Qt5 widgetset
 This packs the pictures and the story into `app/cards.res` (`make-resources.sh`,
 generated and not stored in the repository) and builds `build/tiecards`. Sound
 uses whichever of `paplay`, `pw-play` or `aplay` is installed; without one the
-game is silent.
+game is silent. The window carries the moon icon by itself. For an icon in the
+application menu, run `tools/install-linux-launcher.sh` (menu entry and icon,
+under `~/.local/share`), or `--icon-only` if you made the menu entry yourself and
+just want to add `Icon=tiecards` to it.
 
 ### Windows (cross-compiled from Linux)
 
