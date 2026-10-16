@@ -12,7 +12,7 @@ unit Rules;
 interface
 
 uses
-  SysUtils, TriPeaks, Specials, Inventory, Vampires, Duel, Story, HandFile, Trophies;
+  SysUtils, TriPeaks, Specials, Inventory, Vampires, Duel, Story, HandFile, Trophies, Cosmetics;
 
 function RulesSectionCount: Integer;
 function RulesHeading(I: Integer; AStory: TStory): string;
@@ -27,7 +27,7 @@ const
 implementation
 
 const
-  Sections = 12;
+  Sections = 13;
   RankNames: array[0..VampireCount - 1] of string = ('Jack', 'Queen', 'King');
 
 function RulesSectionCount: Integer;
@@ -49,6 +49,7 @@ begin
     8: Result := 'The silver cross';
     9: Result := 'Saving your game';
     10: Result := 'Trophies';
+    11: Result := 'Style';
   else
     Result := 'Free Play and Records';
   end;
@@ -211,6 +212,17 @@ begin
     'Trophies you already deserved from your earlier wins and kills were put on the shelf the first time the game started with trophies. The flawless trophy is only earned in a run that is played from the start.';
 end;
 
+function BodyStyle(AStory: TStory): string;
+begin
+  Result :=
+    'Style changes how the game looks and never how it plays: the backs of the cards, the table cloth, and the colour of the moon over the house.' + RulesBreak +
+    'Open it from the Style button on the start menu, or from the Store. Each kind has its own tab. Every kind starts with the original look, which is always yours.' + RulesBreak +
+    Format('The others are bought from Fenwick at fixed prices: %d coins for a card back, %d for a table cloth, %d for a moon. They never go on sale, and the campaign''s cheaper Store prices do not apply to them.',
+      [BackPrice, ClothPrice, MoonPrice]) + RulesBreak +
+    'The last one of each kind cannot be bought. It is unlocked by the trophy of a vampire you kill, and the page says which.' + RulesBreak +
+    'Pick what you own with Use. You can change your style at any time, even in the middle of a hand. What you bought goes with your coins: loading a Campaign save takes it back to what you had then, and Erase everything clears it.';
+end;
+
 function BodyFree(AStory: TStory): string;
 begin
   Result :=
@@ -236,6 +248,7 @@ begin
     8: Result := BodyCross(AStory);
     9: Result := BodySaving(AStory);
     10: Result := BodyTrophies(AStory);
+    11: Result := BodyStyle(AStory);
   else
     Result := BodyFree(AStory);
   end;

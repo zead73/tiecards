@@ -13,7 +13,7 @@ interface
 
 uses
   JS, Web, SysUtils, Math, Types, Cards, TriPeaks, Stage, Vampires, DuelInfo,
-  Trophies, GameController;
+  Trophies, Cosmetics, GameController;
 
 const
   PortraitLevels = 12;               { brightness steps for fading a portrait }
@@ -26,7 +26,7 @@ type
     FDpr: Double;
     FCtl: TGameController;
     FBack: TJSHTMLCanvasElement;     { the card back at FBackW x FBackH }
-    FBackW, FBackH: Integer;
+    FBackW, FBackH, FBackStyle: Integer;    { the size and style of the cached card back }
     FShaded: array[0..PortraitCount - 1, 0..PortraitLevels] of TJSHTMLCanvasElement;
     FShadedW, FShadedH: array[0..PortraitCount - 1] of Integer;
     FTouch: Boolean;
@@ -64,6 +64,8 @@ type
     procedure DrawPanelStrip(const R: TRect; const Info: TDuelInfo; const St: TPanelStats);
     procedure DrawStatsBlock(X0, X1, Y, K: Double; const St: TPanelStats);
     procedure DrawTrophyShelf(const L: TTrophyLayout; const St: TPanelStats);
+    function BackCardStyled(W, H, AStyle: Integer): TJSObject;
+    procedure DrawStylePreview(const R: TRect; P: Integer);
     procedure DrawFreeColumn(X0, X1, Y, Bottom, K: Double; const St: TPanelStats);
     procedure DrawFreeStrip(const R: TRect; const St: TPanelStats);
     procedure PanelFrame(const R: TRect; K: Double);
@@ -280,13 +282,23 @@ begin
 end;
 
 { The gothic card back, drawn once per size. }
+function RgbStr(C: Integer): string;
+begin
+  Result := Format('rgb(%d,%d,%d)', [ColorR(C), ColorG(C), ColorB(C)]);
+end;
+
 function TWebView.BackCard(W, H: Integer): TJSObject;
+begin
+  Result := BackCardStyled(W, H, FCtl.StyleBack);
+end;
+
+function TWebView.BackCardStyled(W, H, AStyle: Integer): TJSObject;
 var
   C2: TJSCanvasRenderingContext2D;
   PW, PH, Inset, L, T, Rt, B, K, Step, Lo, Hi, CX, CY, Rad, Sz: Integer;
   S: Double;
 begin
-  if (FBack <> nil) and (FBackW = W) and (FBackH = H) then
+  if (FBack <> nil) and (FBackW = W) and (FBackH = H) and (FBackStyle = AStyle) then
   begin
     Result := FBack;
     Exit;
@@ -294,6 +306,7 @@ begin
   FBack := TJSHTMLCanvasElement(document.createElement('canvas'));
   FBackW := W;
   FBackH := H;
+  FBackStyle := AStyle;
   PW := Round(W * FDpr);
   PH := Round(H * FDpr);
   FBack.width := PW;
@@ -302,8 +315,8 @@ begin
   S := FDpr;
   C2.scale(S, S);
   { the same picture as the desktop's DrawCardBack, in the same proportions }
-  C2.fillStyle := 'rgb(42,13,26)';
-  C2.strokeStyle := 'rgb(13,6,8)';
+  C2.fillStyle := RgbStr(BackColor(AStyle, 0));
+  C2.strokeStyle := RgbStr(BackColor(AStyle, 1));
   C2.lineWidth := 1;
   C2.beginPath;
   C2.moveTo(W / 16, 0);
@@ -321,7 +334,7 @@ begin
   C2.beginPath;
   C2.rect(L, T, Rt - L, B - T);
   C2.clip;
-  C2.strokeStyle := 'rgb(74,26,44)';
+  C2.strokeStyle := RgbStr(BackColor(AStyle, 2));
   C2.lineWidth := 1;
   Step := W div 5;
   if Step < 4 then Step := 4;
@@ -349,7 +362,7 @@ begin
   end;
   C2.restore;
   { frames }
-  C2.strokeStyle := 'rgb(201,162,74)';
+  C2.strokeStyle := RgbStr(BackColor(AStyle, 3));
   C2.lineWidth := W div 40 + 1;
   C2.beginPath;
   C2.moveTo(W / 12 + W / 20, W / 12);
@@ -359,7 +372,7 @@ begin
   C2.arcTo(W / 12, W / 12, W - W / 12, W / 12, W / 20);
   C2.closePath;
   C2.stroke;
-  C2.strokeStyle := 'rgb(122,42,58)';
+  C2.strokeStyle := RgbStr(BackColor(AStyle, 4));
   C2.lineWidth := 1;
   C2.beginPath;
   C2.moveTo(W / 8 + 1 + W / 24, W / 8 + 1);
@@ -373,20 +386,20 @@ begin
   CX := W div 2;
   CY := H div 2;
   Rad := W * 28 div 100;
-  C2.fillStyle := 'rgb(13,6,8)';
-  C2.strokeStyle := 'rgb(201,162,74)';
+  C2.fillStyle := RgbStr(BackColor(AStyle, 1));
+  C2.strokeStyle := RgbStr(BackColor(AStyle, 3));
   C2.lineWidth := W div 50 + 1;
   C2.beginPath; C2.arc(CX, CY, Rad, 0, 2 * Pi); C2.fill; C2.stroke;
-  C2.fillStyle := 'rgb(201,162,74)';
+  C2.fillStyle := RgbStr(BackColor(AStyle, 3));
   Rad := W * 17 div 100;
   C2.beginPath; C2.arc(CX, CY, Rad, 0, 2 * Pi); C2.fill;
-  C2.fillStyle := 'rgb(13,6,8)';
+  C2.fillStyle := RgbStr(BackColor(AStyle, 1));
   Rad := W * 15 div 100;
   C2.beginPath;
   C2.arc(CX + W * 7 div 100, CY - W * 3 div 100, Rad, 0, 2 * Pi);
   C2.fill;
   { small four-point star }
-  C2.fillStyle := 'rgb(201,162,74)';
+  C2.fillStyle := RgbStr(BackColor(AStyle, 3));
   Sz := W * 7 div 100;
   CX := CX + W * 12 div 100;
   CY := CY - W * 11 div 100;
@@ -460,7 +473,9 @@ begin
   begin
     D := I / 10;
     T := Power(Min(1, D * 1.15), 1.7);
-    GradStop(Gr, D, Format('rgb(%d,%d,%d)', [Lerp(24, 5, T), Lerp(74, 16, T), Lerp(48, 11, T)]));
+    GradStop(Gr, D, Format('rgb(%d,%d,%d)', [Lerp(ColorR(ClothColor(FCtl.StyleCloth, 0)), ColorR(ClothColor(FCtl.StyleCloth, 1)), T),
+      Lerp(ColorG(ClothColor(FCtl.StyleCloth, 0)), ColorG(ClothColor(FCtl.StyleCloth, 1)), T),
+      Lerp(ColorB(ClothColor(FCtl.StyleCloth, 0)), ColorB(ClothColor(FCtl.StyleCloth, 1)), T)]));
   end;
   FCtx.fillStyle := Gr;
   FCtx.fillRect(-1, -1, 2, 2);
@@ -470,13 +485,13 @@ begin
   M := Round(10 * FCtl.Scale) + 6;
   Th := Max(1, Round(FCtl.Scale * 1.5));
   Dm := Round(5 * FCtl.Scale) + 2;
-  StrokeColor(110, 90, 46);
+  FCtx.strokeStyle := RgbStr(ClothColor(FCtl.StyleCloth, 2));
   FCtx.lineWidth := Th;
   FCtx.strokeRect(M, M, FW - 2 * M, FH - 2 * M);
-  StrokeColor(58, 48, 26);
+  FCtx.strokeStyle := RgbStr(ClothColor(FCtl.StyleCloth, 3));
   FCtx.lineWidth := 1;
   FCtx.strokeRect(M + 4 * Th + 2, M + 4 * Th + 2, FW - 2 * (M + 4 * Th + 2), FH - 2 * (M + 4 * Th + 2));
-  FillColor(110, 90, 46);
+  FCtx.fillStyle := RgbStr(ClothColor(FCtl.StyleCloth, 2));
   Diamond(M, M);
   Diamond(FW - M, M);
   Diamond(M, FH - M);
@@ -782,7 +797,7 @@ var
   Img: TJSObject;
   S, W, H: Double;
 begin
-  Img := ImageOf('house');
+  Img := ImageOf(HouseImageKey(FCtl.StyleMoon));
   S := Max(FW / 1600, FH / 1000);
   W := 1600 * S;
   H := 1000 * S;
@@ -999,6 +1014,63 @@ begin
   end;
 end;
 
+{ A Style row's picture, drawn in code: a card back, a bit of the table cloth, or the moon. }
+procedure TWebView.DrawStylePreview(const R: TRect; P: Integer);
+var
+  Kind, Item, Steps, I: Integer;
+  W, H, CX, CY, Rad, F: Double;
+  Cen, Edg: Integer;
+  Gr: TJSCanvasGradient;
+begin
+  Kind := (P - 1) div 16;
+  Item := (P - 1) mod 16;
+  W := R.Right - R.Left;
+  H := R.Bottom - R.Top;
+  case Kind of
+    0: FCtx.drawImage(BackCardStyled(Round(W), Round(H), Item), R.Left, R.Top, W, H);
+    1:
+    begin
+      Cen := ClothColor(Item, 0);
+      Edg := ClothColor(Item, 1);
+      { the felt is dark: show it a little lighter so the swatch reads in a small picture }
+      Gr := FCtx.createRadialGradient(R.Left + W / 2, R.Top + H / 2, 0, R.Left + W / 2, R.Top + H / 2, Max(W, H) * 0.7);
+      GradStop(Gr, 0, Format('rgb(%d,%d,%d)', [Min(255, ColorR(Cen) * 2), Min(255, ColorG(Cen) * 2), Min(255, ColorB(Cen) * 2)]));
+      GradStop(Gr, 1, Format('rgb(%d,%d,%d)', [Min(255, ColorR(Edg) * 2 + 14), Min(255, ColorG(Edg) * 2 + 14), Min(255, ColorB(Edg) * 2 + 14)]));
+      FCtx.fillStyle := Gr;
+      RRect(R.Left, R.Top, W, H, 8);
+      FCtx.fill;
+      FCtx.strokeStyle := RgbStr(ClothColor(Item, 2));
+      FCtx.lineWidth := 1;
+      RRect(R.Left + 3, R.Top + 3, W - 6, H - 6, 6);
+      FCtx.stroke;
+    end;
+  else
+    begin
+      FillColor(22, 14, 36);
+      StrokeColor(80, 64, 40);
+      FCtx.lineWidth := 1;
+      RRect(R.Left, R.Top, W, H, 8);
+      FCtx.fill;
+      FCtx.stroke;
+      CX := R.Left + W / 2;
+      CY := R.Top + H / 2;
+      Rad := Min(W, H) * 0.3;
+      FCtx.fillStyle := RgbStr(MoonColor(Item, 0));
+      FCtx.beginPath;
+      FCtx.arc(CX, CY, Rad, 0, 2 * Pi);
+      FCtx.fill;
+      if MoonColor(Item, 1) >= 0 then
+      begin
+        FCtx.strokeStyle := RgbStr(MoonColor(Item, 1));
+        FCtx.lineWidth := Max(1, Rad / 7);
+        FCtx.beginPath;
+        FCtx.arc(CX, CY, Rad + 1, 0, 2 * Pi);
+        FCtx.stroke;
+      end;
+    end;
+  end;
+end;
+
 procedure TWebView.DrawStatsBlock(X0, X1, Y, K: Double; const St: TPanelStats);
 var
   Px, RowH, Mid, Gap: Double;
@@ -1061,7 +1133,7 @@ begin
   PH := Bottom - 8 * K - Y;
   if (PW > 8) and (PH >= 60 * K) then
   begin
-    Img := ImageOf('house');
+    Img := ImageOf(HouseImageKey(FCtl.StyleMoon));
     A := PW / PH;
     CH := 1000;
     CW := CH * A;
@@ -1493,6 +1565,29 @@ begin
   end;
 
   { the rows }
+  { the tabs above the rows (the Style page) }
+  for I := 0 to FCtl.OverlayTabCount - 1 do
+  begin
+    R := FCtl.OverlayTabRect(I);
+    if FCtl.OverlayTabSelected(I) then
+    begin
+      FillColor(201, 162, 74);
+      StrokeColor(150, 118, 46);
+    end
+    else
+    begin
+      FillColor(30, 19, 38);
+      StrokeColor(110, 90, 46);
+    end;
+    FCtx.lineWidth := 1;
+    RRect(R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top, 8 * K);
+    FCtx.fill;
+    FCtx.stroke;
+    SetFont(Max(14, 13 * K), True, False);
+    if FCtl.OverlayTabSelected(I) then FillColor(30, 19, 38) else FillColor(232, 224, 204);
+    S := FCtl.OverlayTabCaption(I);
+    Text(S, R.Left + ((R.Right - R.Left) - TextW(S)) / 2, R.Top + ((R.Bottom - R.Top) - Max(14, 13 * K)) / 2 - 2);
+  end;
   for I := 0 to FCtl.OverlayRowCount - 1 do
   begin
     Row := FCtl.OverlayRow(I);
@@ -1520,7 +1615,14 @@ begin
     FCtx.stroke;
     { the little card picture (the records page has none) }
     X := R.Left + 10 * K;
-    if Row.Art >= 0 then
+    if Row.Preview > 0 then
+    begin
+      IconH := R.Bottom - R.Top - 8;
+      IconW := IconH * 164 / 232;
+      DrawStylePreview(Rect(Round(R.Left + 6), Round(R.Top + 4), Round(R.Left + 6 + IconW), Round(R.Top + 4 + IconH)), Row.Preview);
+      X := R.Left + 6 + IconW + 10 * K;
+    end
+    else if Row.Art >= 0 then
     begin
       IconH := R.Bottom - R.Top - 8;
       IconW := IconH * 164 / 232;
@@ -1612,6 +1714,19 @@ begin
   SetFont(Max(16, 14 * K), True, False);
   FillColor(201, 162, 74);
   Text(FCtl.OverlayFooter, R.Left, R.Top + ((R.Bottom - R.Top) - Max(16, 14 * K)) / 2 - 2);
+  if FCtl.OverlayExtraCaption <> '' then              { a button beside Leave: the Store's Style }
+  begin
+    R := FCtl.OverlayExtraRect;
+    FillColor(42, 29, 54);
+    StrokeColor(110, 90, 46);
+    RRect(R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top, 8 * K);
+    FCtx.fill;
+    FCtx.stroke;
+    SetFont(Max(16, 14 * K), True, False);
+    FillColor(232, 224, 204);
+    S := FCtl.OverlayExtraCaption;
+    Text(S, R.Left + ((R.Right - R.Left) - TextW(S)) / 2, R.Top + ((R.Bottom - R.Top) - Max(16, 14 * K)) / 2 - 2);
+  end;
   R := FCtl.OverlayLeaveRect;
   FillColor(42, 29, 54);
   StrokeColor(201, 162, 74);

@@ -12,7 +12,7 @@ interface
 uses
   Classes, SysUtils, Types, Math, Forms, Controls, Graphics, ExtCtrls, StdCtrls, Menus, Dialogs,
   LCLType,
-  Cards, TriPeaks, Inventory, Session, Stage, DuelInfo, Story, Duel, Settings,
+  Cards, TriPeaks, Inventory, Session, Stage, DuelInfo, Story, Duel, Settings, Cosmetics,
   HandFile, GameController,
   CardImages, TableBg, WinScreen, SceneView, DuelPanel, StoreView;
 
@@ -499,6 +499,11 @@ begin
     FBuffer.SetSize(pbTable.Width, pbTable.Height);
   FCv := FBuffer.Canvas;
   FCtl.SetViewport(pbTable.Width, pbTable.Height);
+  { the look the player chose: card backs, table cloth, the moon on the house }
+  BackStyle := FCtl.StyleBack;
+  FTable.SetCloth(FCtl.StyleCloth);
+  FSceneView.SetHouse(HouseImageKey(FCtl.StyleMoon));
+  FPanelView.SetHouse(HouseImageKey(FCtl.StyleMoon));
   PaintScene;
   pbTable.Canvas.Draw(0, 0, FBuffer);
 end;

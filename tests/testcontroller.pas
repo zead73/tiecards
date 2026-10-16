@@ -6,7 +6,7 @@ program TestController;
 {$mode objfpc}{$H+}
 
 uses SysUtils, Types, Classes, Cards, TriPeaks, Inventory, Session, Stage, Story, Vampires, Specials,
-  Campaign, Duel, DuelSession, DuelInfo, Settings, HandFile, CampaignSlots, Storage, Records, Trophies, GameController
+  Campaign, Duel, DuelSession, DuelInfo, Settings, HandFile, CampaignSlots, Storage, Records, Trophies, Cosmetics, GameController
   {$IFDEF PAS2JS}, JsCompat{$ENDIF};
 
 var
@@ -1135,10 +1135,11 @@ begin
   try
     C.StartWithMenu;
     Check(C.MenuOpen, 'the program opens on the start menu');
-    Check(C.MenuButtonCount = 5, 'five buttons where the program cannot quit (the web page)');
+    Check(C.MenuButtonCount = 6, 'six buttons where the program cannot quit (the web page)');
     Check((C.MenuButtonCaption(0) = 'Campaign') and (C.MenuButtonCaption(1) = 'Free Play')
       and (C.MenuButtonCaption(2) = 'Save game') and (C.MenuButtonCaption(3) = 'Load game')
-      and (C.MenuButtonCaption(4) = 'Rules'), 'Campaign, Free Play, Save game, Load game and Rules');
+      and (C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Style'),
+      'Campaign, Free Play, Save game, Load game, Rules and Style');
     Check(not C.NeedsTicks, 'nothing animates behind the menu');
     U := C.GetUi;
     Check(not U.StoreEnabled and not U.CardsEnabled and not U.UndoEnabled and not U.RecordsEnabled and not U.SaveEnabled,
@@ -1236,14 +1237,15 @@ begin
     C.CanQuit := True;
     C.OnQuit := @W.OnQuit;
     C.ActionOpenMenu;
-    Check(C.MenuButtonCount = 6, 'six buttons where the program can quit');
-    Check((C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Quit'), 'Rules, then Quit');
+    Check(C.MenuButtonCount = 7, 'seven buttons where the program can quit');
+    Check((C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Style') and (C.MenuButtonCaption(6) = 'Quit'), 'Rules, Style, then Quit');
     for I := 0 to C.MenuButtonCount - 1 do
       Check((C.MenuButtonRect(I).Left >= 0) and (C.MenuButtonRect(I).Right <= 1520) and (C.MenuButtonRect(I).Bottom <= 584),
         'with Quit as well, button ' + IntToStr(I) + ' is on screen');
     Check((C.MenuButtonRect(5).Left >= C.MenuButtonRect(4).Right) and (C.MenuButtonRect(5).Top = C.MenuButtonRect(4).Top),
-      'Quit sits beside Rules');
-    TapMenuButton(C, 5);
+      'Style sits beside Rules');
+    Check(C.MenuButtonRect(6).Top >= C.MenuButtonRect(5).Bottom, 'and Quit has its own row below');
+    TapMenuButton(C, 6);
     Check(W.Quits = 1, 'Quit tells the program to close');
     Check(C.MenuOpen, 'and the menu stays up meanwhile');
   finally
@@ -1498,6 +1500,126 @@ begin
     C.ActionAnswerDelete(True);
     Check(not PeekCampaignSlot(2).Exists, 'the campaign save is gone');
     Check((C.OverlayRow(6).Detail = 'Empty') and (C.OverlayRow(6).Button2Text = ''), 'and its row is empty');
+  finally
+    C.Free; W.Free; D.Free; St.Free;
+  end;
+end;
+
+{ The Style page: card backs, table cloths and the moon. }
+procedure TapStyleTab(C: TGameController; I: Integer);
+var
+  R: TRect;
+begin
+  R := C.OverlayTabRect(I);
+  C.Tap((R.Left + R.Right) div 2, (R.Top + R.Bottom) div 2);
+end;
+
+procedure TestStyle;
+var
+  St: TStory;
+  C: TGameController;
+  D: TDecks;
+  W: TWatcher;
+  Coins0, I: Integer;
+begin
+  WipeStore;
+  St := TStory.Create;
+  St.LoadFromFile(StoryPath);
+  D := TDecks.Create;
+  W := TWatcher.Create;
+  C := NewCtl(St, D, W);
+  try
+    C.StartWithMenu;
+    Check((C.StyleBack = 0) and (C.StyleCloth = 0) and (C.StyleMoon = 0), 'the original look to begin with');
+    TapMenuButton(C, 5);
+    Check((C.Overlay = okStyle) and C.MenuOpen, 'the menu''s Style button opens the page over the menu');
+    Check(C.OverlayTabCount = 3, 'three tabs');
+    Check(C.OverlayTabSelected(0) and not C.OverlayTabSelected(1), 'the card backs first');
+    Check(C.OverlayRowCount = 4, 'four card backs');
+    Check((C.OverlayRow(0).ButtonText = 'In use') and not C.OverlayRow(0).ButtonEnabled and C.OverlayRow(0).Selected,
+      'the original is in use');
+    Check(C.OverlayRow(0).Title = St.StyleName('back.moon'), 'with its name from the story');
+    Check((C.OverlayRow(1).ButtonText = 'Buy') and not C.OverlayRow(1).ButtonEnabled and (C.OverlayRow(1).Aside = '60 coins'),
+      'a back costs its list price and 50 coins do not reach it');
+    Check((C.OverlayRow(3).ButtonText = '') and (C.OverlayRow(3).Aside = 'locked')
+      and (Pos(St.TrophyName('jack'), C.OverlayRow(3).Detail) > 0), 'the last is earned: it names the trophy');
+    Check(C.OverlayRow(1).Preview = 1 * 0 + 1 + 1, 'each row has a preview to draw');
+    Check(C.OverlayRow(2).Preview = 3, 'numbered by kind and item');
+
+    { buy }
+    C.Session.Inventory.AddCoins(500);
+    Coins0 := C.Session.Inventory.Coins;
+    Check(C.OverlayRow(1).ButtonEnabled, 'with the coins, Buy is on');
+    TapSlotButton(C, 1);
+    Check(C.Session.Inventory.Coins = Coins0 - BackPrice, 'buying takes the price');
+    Check(C.StyleBack = 1, 'and puts it in use');
+    Check((C.OverlayRow(1).ButtonText = 'In use') and (C.OverlayRow(0).ButtonText = 'Use'), 'the page says so');
+    Check(Pos('Bought', C.GetUi.StatusText) > 0, 'with a message: ' + C.GetUi.StatusText);
+    TapSlotButton(C, 0);
+    Check(C.StyleBack = 0, 'Use on the original goes back');
+    TapSlotButton(C, 1);
+    Check((C.StyleBack = 1) and (C.Session.Inventory.Coins = Coins0 - BackPrice), 'using what you own costs nothing');
+
+    { an earned one }
+    C.Trophies.Award(trVampire0);
+    Check((C.OverlayRow(3).ButtonText = 'Use') and C.OverlayRow(3).ButtonEnabled, 'a trophy unlocks it');
+    TapSlotButton(C, 3);
+    Check(C.StyleBack = 3, 'and it can be used');
+
+    { tabs }
+    TapStyleTab(C, 1);
+    Check(C.OverlayTabSelected(1) and (C.OverlayRow(1).Aside = '80 coins'), 'the table cloths, at their own price');
+    TapSlotButton(C, 1);
+    Check(C.StyleCloth = 1, 'a cloth bought and in use');
+    TapStyleTab(C, 2);
+    Check((C.OverlayRow(1).Aside = '50 coins') and (C.OverlayRow(0).Title = St.StyleName('moon.pale')), 'the moons');
+    TapSlotButton(C, 1);
+    Check((C.StyleMoon = 1) and (C.StyleBack = 3) and (C.StyleCloth = 1), 'each kind keeps its own choice');
+    C.KeyPress(True);
+    Check((C.Overlay = okNone) and C.MenuOpen, 'Esc goes back to the menu');
+
+    { it is remembered by the next run }
+    C.Free;
+    C := NewCtl(St, D, W);
+    C.StartWithMenu;
+    Check((C.StyleBack = 3) and (C.StyleCloth = 1) and (C.StyleMoon = 1), 'saved on disk, by key');
+
+    { a choice the player does not have falls back to the original }
+    C.Free;
+    StoreDelete(DefaultInventoryFile);
+    StoreDelete(DefaultTrophiesFile);
+    C := NewCtl(St, D, W);
+    C.StartWithMenu;
+    Check((C.StyleBack = 0) and (C.StyleCloth = 0) and (C.StyleMoon = 0), 'without the coins spent or the trophy, the original look shows');
+
+    { Fenwick's Store has a Style button too }
+    TapMenuButton(C, 1);
+    RunOut(C);
+    C.ActionOpenStore;
+    Check(C.OverlayExtraCaption = '', 'no Style button while Fenwick introduces himself');
+    for I := 1 to 10 do
+      if C.OverlayHint <> '' then C.Tap(5, 5);
+    Check(C.OverlayExtraCaption = 'Style', 'the Store offers Style');
+    C.Tap((C.OverlayExtraRect.Left + C.OverlayExtraRect.Right) div 2, (C.OverlayExtraRect.Top + C.OverlayExtraRect.Bottom) div 2);
+    Check(C.Overlay = okStyle, 'which opens the page');
+    C.ActionCloseOverlay;
+    C.ActionOpenCards;
+    Check(C.OverlayExtraCaption = '', 'the card tray has no such button');
+    C.ActionCloseOverlay;
+
+    { Erase everything goes back; Restart campaign does not }
+    C.Session.Inventory.AddCoins(500);
+    C.ActionOpenStyle;
+    TapSlotButton(C, 1);
+    Check(C.StyleBack = 1, 'test set-up: a back in use');
+    C.ActionCloseOverlay;
+    C.ActionRestartCampaign;
+    ClickThrough(C);
+    RunOut(C);
+    Check(C.StyleBack = 1, 'Restart campaign keeps the look');
+    C.ActionEraseEverything;
+    RunOut(C);
+    Check((C.StyleBack = 0) and not C.Session.Inventory.BoughtCosmetic(ckBack, 1), 'Erase everything takes it all away');
   finally
     C.Free; W.Free; D.Free; St.Free;
   end;
@@ -1857,6 +1979,7 @@ begin
   TestMenu;
   TestSaveSlots;
   TestDeleteSaves;
+  TestStyle;
   TestTrickControls;
   TestCrossControls;
   TestTrophies;

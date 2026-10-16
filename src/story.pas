@@ -11,7 +11,7 @@ uses
 {$IFNDEF PAS2JS}
   Classes,
 {$ENDIF}
-  SysUtils, TextIni, Storage, Vampires, Specials, Trophies;
+  SysUtils, TextIni, Storage, Vampires, Specials, Trophies, Cosmetics;
 
 type
   TStringArray = array of string;
@@ -75,6 +75,9 @@ type
     function TrophyName(const Key: string): string;
     function TrophyHow(const Key: string): string;
     function TrophyLine(const Key: string): string;
+    { A Style item's name and a line about it. Key is Cosmetics.CosmeticStoryKey ('back.blood'). }
+    function StyleName(const Key: string): string;
+    function StyleLine(const Key: string): string;
     function Validate: TStringArray;
   end;
 
@@ -305,9 +308,21 @@ begin
   Result := Value('trophies', Key + '.line');
 end;
 
+function TStory.StyleName(const Key: string): string;
+begin
+  Result := Value('style', Key + '.name');
+end;
+
+function TStory.StyleLine(const Key: string): string;
+begin
+  Result := Value('style', Key + '.line');
+end;
+
 function TStory.Validate: TStringArray;
 var
   V, T: Integer;
+  CK: TCosmeticKind;
+  CI: Integer;
   K: TSpecialKind;
   TR: TTrophy;
 
@@ -354,6 +369,12 @@ begin
   Need('fenwick', 'pitch.hint');
   Need('finale', 'finale.1');
   Need('finale', 'caption');
+  for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
+    for CI := 0 to CosmeticsPerKind - 1 do
+    begin
+      Need('style', CosmeticStoryKey(CK, CI) + '.name');
+      Need('style', CosmeticStoryKey(CK, CI) + '.line');
+    end;
   for TR := Low(TTrophy) to High(TTrophy) do
   begin
     Need('trophies', TrophyKeys[TR] + '.name');

@@ -26,6 +26,7 @@ type
     FScaled: array[0..PortraitCount - 1] of TFPMemoryImage;   { at the current size }
     FScaledW, FScaledH: array[0..PortraitCount - 1] of Integer;
     FShaded: array[0..PortraitCount - 1, 0..PortraitLevels] of TBitmap;
+    FHouseKey: string;               { which house picture: the moon's colour (Cosmetics.HouseImageKey) }
     FHouseMaster: TFPMemoryImage;
     FHouse: TBitmap;                 { the house, scaled to cover FHouseW x FHouseH }
     FHouseW, FHouseH: Integer;
@@ -44,6 +45,8 @@ type
     procedure DrawDialogue(C: TCanvas; const R: TRect; St: TStage);
     { The story's opening: the house on the hill with a box of text. }
     procedure DrawHouseScene(C: TCanvas; const R: TRect; St: TStage);
+    { Which house picture to use; the pictures are rebuilt only when it changes. }
+    procedure SetHouse(const AKey: string);
     { The house picture alone, filling R (cropped to fit), darkened by Dark (0..1). }
     procedure DrawHousePicture(C: TCanvas; const R: TRect; Dark: Double);
     { The house, the middle of the picture, framed to fill R (the Free Play panel). }
@@ -121,6 +124,19 @@ end;
 
 { The vampire's portrait at W x H, darkened to Brightness (0..1). The scaled
   picture is kept per size, and each brightness step is made once. }
+procedure TSceneView.SetHouse(const AKey: string);
+begin
+  if AKey = FHouseKey then Exit;
+  FHouseKey := AKey;
+  FreeAndNil(FHouseMaster);
+  FreeAndNil(FHouse);
+  FreeAndNil(FPanelHouse);
+  FHouseW := 0;
+  FHouseH := 0;
+  FPanelHouseW := 0;
+  FPanelHouseH := 0;
+end;
+
 function TSceneView.Portrait(V, W, H: Integer; Brightness: Double): TBitmap;
 var
   L, Lv: Integer;
@@ -310,7 +326,9 @@ begin
   end;
   if (FHouse = nil) or (FHouseW <> CW) or (FHouseH <> CH) then
   begin
-    if FHouseMaster = nil then FHouseMaster := LoadResourceImage('house');
+    if FHouseMaster = nil then
+      if FHouseKey = '' then FHouseMaster := LoadResourceImage('house')
+      else FHouseMaster := LoadResourceImage(FHouseKey);
     Img := ScaleToImage(FHouseMaster, CW, CH);
     try
       FHouse.Free;
@@ -383,7 +401,9 @@ begin
   if (W < 8) or (H < 8) then Exit;
   if (FPanelHouse = nil) or (FPanelHouseW <> W) or (FPanelHouseH <> H) then
   begin
-    if FHouseMaster = nil then FHouseMaster := LoadResourceImage('house');
+    if FHouseMaster = nil then
+      if FHouseKey = '' then FHouseMaster := LoadResourceImage('house')
+      else FHouseMaster := LoadResourceImage(FHouseKey);
     { the part of the picture that fits R's shape, centred on the house }
     A := W / H;
     CH := FHouseMaster.Height;

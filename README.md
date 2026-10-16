@@ -61,6 +61,9 @@ Things worth knowing before you read the code:
 - You collect trophies for your first win, a perfect hand, each vampire killed, and
   a whole Campaign without losing a hand. They sit on a shelf in the side panel and
   survive restarting the Campaign.
+- Style (from the start menu or the Store): card backs, table cloths and the colour of the
+  moon over the house. A few are bought at fixed prices and a few are earned with a
+  vampire's trophy. They only change how the game looks.
 - Progress is saved automatically (the hand after every move, coins and cards as
   they change). The Menu also has manual save slots for both modes.
 

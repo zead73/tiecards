@@ -10,7 +10,7 @@ unit Inventory;
 interface
 
 uses
-  SysUtils, TextIni, Storage, Specials;
+  SysUtils, TextIni, Storage, Specials, Cosmetics;
 
 const
   StartingCoins = 50;
@@ -33,6 +33,7 @@ type
     FUndoCards: Integer;
     FHintCards: Integer;
     FSpecials: array[TSpecialKind] of Integer;
+    FBought: array[TCosmeticKind, 0..CosmeticsPerKind - 1] of Boolean;   { Style items bought with coins }
     FPaidHands: array of Integer;       { ids of hands whose reward was paid }
     FPricePercent: Integer;
     procedure ParseIds(const S: string);
@@ -49,6 +50,13 @@ type
     function UndoPackPrice: Integer;
     function HintPackPrice: Integer;
     function SpecialPrice(K: TSpecialKind): Integer;
+    { Style (see Cosmetics): the original look is always yours; the others are bought
+      at a fixed list price (never discounted), or unlocked by a trophy (the caller
+      knows the trophies: this only knows what was bought). }
+    function BoughtCosmetic(K: TCosmeticKind; I: Integer): Boolean;
+    function CanBuyCosmetic(K: TCosmeticKind; I: Integer): Boolean;
+    function BuyCosmetic(K: TCosmeticKind; I: Integer): Boolean;   { False if it cannot be bought }
+    function SpendCoins(N: Integer): Boolean;                      { False, taking nothing, if too few }
     procedure AddUndoCards(N: Integer);
     function CanBuyUndoPack: Boolean;
     function BuyUndoPack: Boolean;                  { False if too few coins }
@@ -128,12 +136,41 @@ end;
 procedure TPlayerInventory.Reset;
 var
   K: TSpecialKind;
+  CK: TCosmeticKind;
+  CI: Integer;
 begin
   FCoins := StartingCoins;
   FUndoCards := 0;
   FHintCards := 0;
   for K := Low(TSpecialKind) to High(TSpecialKind) do FSpecials[K] := 0;
   FPaidHands := nil;
+  for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
+    for CI := 0 to CosmeticsPerKind - 1 do FBought[CK, CI] := False;
+end;
+
+function TPlayerInventory.BoughtCosmetic(K: TCosmeticKind; I: Integer): Boolean;
+begin
+  Result := (I >= 0) and (I < CosmeticsPerKind) and FBought[K, I];
+end;
+
+function TPlayerInventory.CanBuyCosmetic(K: TCosmeticKind; I: Integer): Boolean;
+begin
+  Result := (I > 0) and (I < CosmeticsPerKind) and (CosmeticTrophy(K, I) = NoTrophy)
+    and not FBought[K, I] and (FCoins >= CosmeticCost(K, I));
+end;
+
+function TPlayerInventory.BuyCosmetic(K: TCosmeticKind; I: Integer): Boolean;
+begin
+  Result := CanBuyCosmetic(K, I);
+  if not Result then Exit;
+  Dec(FCoins, CosmeticCost(K, I));
+  FBought[K, I] := True;
+end;
+
+function TPlayerInventory.SpendCoins(N: Integer): Boolean;
+begin
+  Result := (N >= 0) and (FCoins >= N);
+  if Result then Dec(FCoins, N);
 end;
 
 procedure TPlayerInventory.AddCoins(N: Integer);
@@ -290,6 +327,8 @@ procedure TPlayerInventory.ImportText(const Text: string);
 var
   Ini: TTextIni;
   K: TSpecialKind;
+  CK: TCosmeticKind;
+  CI: Integer;
 begin
   Reset;
   Ini := TTextIni.Create;
@@ -307,6 +346,10 @@ begin
       FSpecials[K] := Ini.ReadInteger('Inventory', 'Special.' + SpecialKey[K], 0);
       if FSpecials[K] < 0 then FSpecials[K] := 0;
     end;
+    for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
+      for CI := 1 to CosmeticsPerKind - 1 do
+        FBought[CK, CI] := Ini.ReadBool('Inventory', 'Style.' + CosmeticStoryKey(CK, CI), False)
+          and (CosmeticTrophy(CK, CI) = NoTrophy);
   finally
     Ini.Free;
   end;
@@ -316,6 +359,8 @@ function TPlayerInventory.ExportText: string;
 var
   Ini: TTextIni;
   K: TSpecialKind;
+  CK: TCosmeticKind;
+  CI: Integer;
 begin
   Ini := TTextIni.Create;
   try
@@ -325,6 +370,9 @@ begin
     Ini.WriteString('Inventory', 'PaidHands', IdsText);
     for K := Low(TSpecialKind) to High(TSpecialKind) do
       Ini.WriteInteger('Inventory', 'Special.' + SpecialKey[K], FSpecials[K]);
+    for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
+      for CI := 1 to CosmeticsPerKind - 1 do
+        Ini.WriteBool('Inventory', 'Style.' + CosmeticStoryKey(CK, CI), FBought[CK, CI]);
     Result := Ini.ToText;
   finally
     Ini.Free;
@@ -336,6 +384,8 @@ var
   Ini: TTextIni;
   Text: string;
   K: TSpecialKind;
+  CK: TCosmeticKind;
+  CI: Integer;
 begin
   Ini := TTextIni.Create;
   try
@@ -346,6 +396,9 @@ begin
     Ini.WriteString('Inventory', 'PaidHands', IdsText);
     for K := Low(TSpecialKind) to High(TSpecialKind) do
       Ini.WriteInteger('Inventory', 'Special.' + SpecialKey[K], FSpecials[K]);
+    for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
+      for CI := 1 to CosmeticsPerKind - 1 do
+        Ini.WriteBool('Inventory', 'Style.' + CosmeticStoryKey(CK, CI), FBought[CK, CI]);
     StoreWrite(FileName, Ini.ToText);
   finally
     Ini.Free;

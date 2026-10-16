@@ -12,7 +12,7 @@ interface
 
 uses
   Classes, SysUtils, Types, Graphics, IntfGraphics, GraphType, LCLType,
-  FPImage, FPCanvas, FPImgCanv, FPReadPNG, Cards;
+  FPImage, FPCanvas, FPImgCanv, FPReadPNG, Cards, Cosmetics;
 
 type
   TCardImages = class
@@ -30,7 +30,15 @@ type
     function Face(const C: TCard): TBitmap;
   end;
 
+{ Which card back is drawn (see Cosmetics; 0 is the original). The window sets it. }
+var
+  BackStyle: Integer = 0;
+
 procedure DrawCardBack(ACanvas: TCanvas; const R: TRect);
+{ A card back in a given style (the Style page's previews). }
+procedure DrawCardBackStyle(ACanvas: TCanvas; const R: TRect; AStyle: Integer);
+{ A Cosmetics colour (0xRRGGBB) as a canvas colour. }
+function StyleColor(C: Integer): TColor;
 
 { Shared by the win screen: load an embedded PNG, and scale any image smoothly
   into a new TBitmap with alpha. Caller owns both results. }
@@ -169,17 +177,27 @@ end;
 
 { ---- card back: deep burgundy, gold frame, diamond lattice, crescent moon ---- }
 
+function StyleColor(C: Integer): TColor;
+begin
+  Result := RGBToColor(ColorR(C), ColorG(C), ColorB(C));
+end;
+
 procedure DrawCardBack(ACanvas: TCanvas; const R: TRect);
-const
-  Wine = $1A0D2A;          { BGR: RGB(42, 13, 26) }
-  WineDark = $08060D;      { RGB(13, 6, 8)  }
-  WineLine = $2C1A4A;      { RGB(74, 26, 44) }
-  Gold = $4AA2C9;          { RGB(201, 162, 74) }
-  GoldDim = $3A2A7A;       { RGB(122, 42, 58) }
+begin
+  DrawCardBackStyle(ACanvas, R, BackStyle);
+end;
+
+procedure DrawCardBackStyle(ACanvas: TCanvas; const R: TRect; AStyle: Integer);
 var
+  Wine, WineDark, WineLine, Gold, GoldDim: TColor;     { style 0 is RGB(42,13,26), (13,6,8), (74,26,44), (201,162,74), (122,42,58) }
   W, H, Inset, K, Step, Lo, Hi, CX, CY, Rad: Integer;
   L, T, Rt, B: Integer;
 begin
+  Wine := StyleColor(BackColor(AStyle, 0));
+  WineDark := StyleColor(BackColor(AStyle, 1));
+  WineLine := StyleColor(BackColor(AStyle, 2));
+  Gold := StyleColor(BackColor(AStyle, 3));
+  GoldDim := StyleColor(BackColor(AStyle, 4));
   W := R.Right - R.Left;
   H := R.Bottom - R.Top;
   with ACanvas do

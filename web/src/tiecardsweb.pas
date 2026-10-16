@@ -11,7 +11,7 @@ program tiecardsweb;
 
 uses
   JS, Web, SysUtils, Math, Types, Cards, Story, Sound, Storage, Settings, HandFile,
-  GameController, WebView;
+  GameController, Cosmetics, WebView;
 
 type
   TWebApp = class
@@ -629,6 +629,11 @@ begin
   end;
   Pairs.push('house');
   Pairs.push('assets/house/house.png');
+  for V := 1 to 3 do                       { the moons of the Style page }
+  begin
+    Pairs.push(HouseImageKey(V));
+    Pairs.push('assets/house/' + HouseImageKey(V) + '.png');
+  end;
   Pairs.push('win_screen');
   Pairs.push('assets/win/win_screen.png');
   Pairs.push('shopkeeper');

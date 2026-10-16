@@ -8,7 +8,7 @@ unit Settings;
 interface
 
 uses
-  SysUtils, TextIni, Storage, Campaign;
+  SysUtils, TextIni, Storage, Campaign, Cosmetics;
 
 type
   TGameMode = (gmFreePlay, gmCampaign);
@@ -20,6 +20,7 @@ type
     FFenwickMet: Boolean;
     FWrapUnlocked: Boolean;
     FStockUnlocked: Boolean;
+    FBackKey, FClothKey, FMoonKey: string;
   public
     { AFileName = '' means never load or save (used by tests). A missing or
       unreadable file gives the defaults. }
@@ -33,6 +34,12 @@ type
     property WrapUnlocked: Boolean read FWrapUnlocked write FWrapUnlocked;
     { Likewise the Full deck card, from the first vampire with a smaller stock. }
     property StockUnlocked: Boolean read FStockUnlocked write FStockUnlocked;
+    { The Style the player picked (a key from Cosmetics). Always check the player still
+      has it: a loaded save or a hand-edited file may not. }
+    property BackKey: string read FBackKey write FBackKey;
+    property ClothKey: string read FClothKey write FClothKey;
+    property MoonKey: string read FMoonKey write FMoonKey;
+    procedure ResetStyle;             { back to the original look }
   end;
 
 { Per-user save location (works on Linux and Windows). }
@@ -53,6 +60,7 @@ begin
   inherited Create;
   FFile := AFileName;
   FMode := gmFreePlay;
+  ResetStyle;
   if (FFile <> '') and StoreRead(FFile, Text) then
   begin
     Ini := TTextIni.Create;
@@ -63,6 +71,9 @@ begin
       FFenwickMet := Ini.ReadBool('Settings', 'FenwickMet', False);
       FWrapUnlocked := Ini.ReadBool('Settings', 'WrapUnlocked', False);
       FStockUnlocked := Ini.ReadBool('Settings', 'StockUnlocked', False);
+      FBackKey := Ini.ReadString('Settings', 'Back', FBackKey);
+      FClothKey := Ini.ReadString('Settings', 'Cloth', FClothKey);
+      FMoonKey := Ini.ReadString('Settings', 'Moon', FMoonKey);
     finally
       Ini.Free;
     end;
@@ -85,10 +96,20 @@ begin
     Ini.WriteBool('Settings', 'FenwickMet', FFenwickMet);
     Ini.WriteBool('Settings', 'WrapUnlocked', FWrapUnlocked);
     Ini.WriteBool('Settings', 'StockUnlocked', FStockUnlocked);
+    Ini.WriteString('Settings', 'Back', FBackKey);
+    Ini.WriteString('Settings', 'Cloth', FClothKey);
+    Ini.WriteString('Settings', 'Moon', FMoonKey);
     StoreWrite(FFile, Ini.ToText);
   finally
     Ini.Free;
   end;
+end;
+
+procedure TSettings.ResetStyle;
+begin
+  FBackKey := CosmeticKey(ckBack, 0);
+  FClothKey := CosmeticKey(ckCloth, 0);
+  FMoonKey := CosmeticKey(ckMoon, 0);
 end;
 
 function DefaultSettingsFile: string;

@@ -10,7 +10,7 @@ interface
 
 uses
   Classes, SysUtils, Types, Math, Graphics, FPImage, CardImages, SceneView,
-  Specials, GameController;
+  Specials, Cosmetics, GameController;
 
 type
   TStoreView = class
@@ -22,6 +22,7 @@ type
     FIcons: array[0..OverlayArtCount - 1] of TBitmap;
     FIconSize: Integer;
     function Icon(Art, Size: Integer): TBitmap;
+    procedure DrawPreview(C: TCanvas; const R: TRect; P: Integer; K: Double);
     function PortraitBmp(W, H: Integer): TBitmap;
     procedure TextIn(C: TCanvas; const R: TRect; const S: string);
   public
@@ -78,6 +79,73 @@ begin
     FPH := H;
   end;
   Result := FPortrait;
+end;
+
+{ A Style row's picture, drawn in code: a card back, a bit of the table cloth, or the moon. }
+procedure TStoreView.DrawPreview(C: TCanvas; const R: TRect; P: Integer; K: Double);
+var
+  Kind, Item, I, Steps, CX, CY, Rad, W, H: Integer;
+  F: Double;
+  Cen, Edg: Integer;
+begin
+  Kind := (P - 1) div 16;
+  Item := (P - 1) mod 16;
+  W := R.Right - R.Left;
+  H := R.Bottom - R.Top;
+  case Kind of
+    0: DrawCardBackStyle(C, R, Item);
+    1:
+    begin
+      { the felt: dark at the edge, lighter in the middle, with its frame }
+      Cen := ClothColor(Item, 0);
+      Edg := ClothColor(Item, 1);
+      { the felt is dark: show it a little lighter so the swatch reads in a small picture }
+      Cen := (Min(255, ColorR(Cen) * 17 div 8) shl 16) or (Min(255, ColorG(Cen) * 17 div 8) shl 8) or Min(255, ColorB(Cen) * 17 div 8);
+      Edg := (Min(255, ColorR(Edg) * 17 div 8 + 14) shl 16) or (Min(255, ColorG(Edg) * 17 div 8 + 14) shl 8) or Min(255, ColorB(Edg) * 17 div 8 + 14);
+      C.Pen.Style := psClear;
+      C.Brush.Style := bsSolid;
+      Steps := 6;
+      for I := 0 to Steps do
+      begin
+        F := I / Steps;
+        C.Brush.Color := RGBToColor(
+          Round(ColorR(Edg) + (ColorR(Cen) - ColorR(Edg)) * F),
+          Round(ColorG(Edg) + (ColorG(Cen) - ColorG(Edg)) * F),
+          Round(ColorB(Edg) + (ColorB(Cen) - ColorB(Edg)) * F));
+        C.RoundRect(R.Left + I * W div 14, R.Top + I * H div 14, R.Right - I * W div 14, R.Bottom - I * H div 14, 8, 8);
+      end;
+      C.Brush.Style := bsClear;
+      C.Pen.Style := psSolid;
+      C.Pen.Width := 1;
+      C.Pen.Color := StyleColor(ClothColor(Item, 2));
+      C.RoundRect(R.Left + 3, R.Top + 3, R.Right - 3, R.Bottom - 3, 6, 6);
+    end;
+  else
+    begin
+      { the moon in a night sky }
+      C.Brush.Style := bsSolid;
+      C.Brush.Color := RGBToColor(22, 14, 36);
+      C.Pen.Style := psSolid;
+      C.Pen.Width := 1;
+      C.Pen.Color := RGBToColor(80, 64, 40);
+      C.RoundRect(R.Left, R.Top, R.Right, R.Bottom, 8, 8);
+      CX := (R.Left + R.Right) div 2;
+      CY := (R.Top + R.Bottom) div 2;
+      Rad := Min(W, H) * 3 div 10;
+      C.Brush.Color := StyleColor(MoonColor(Item, 0));
+      C.Pen.Color := C.Brush.Color;
+      C.Ellipse(CX - Rad, CY - Rad, CX + Rad, CY + Rad);
+      if MoonColor(Item, 1) >= 0 then
+      begin
+        C.Brush.Style := bsClear;
+        C.Pen.Color := StyleColor(MoonColor(Item, 1));
+        C.Pen.Width := Max(1, Rad div 7);
+        C.Ellipse(CX - Rad - 1, CY - Rad - 1, CX + Rad + 1, CY + Rad + 1);
+        C.Pen.Width := 1;
+      end;
+    end;
+  end;
+  C.Brush.Style := bsClear;
 end;
 
 function TStoreView.Icon(Art, Size: Integer): TBitmap;
@@ -195,6 +263,32 @@ begin
     C.TextOut(Sp.Right - C.TextWidth(S) - Round(12 * K), Sp.Bottom - C.TextHeight(S) - Round(6 * K), S);
   end;
 
+  { the tabs above the rows (the Style page) }
+  for I := 0 to Ctl.OverlayTabCount - 1 do
+  begin
+    R := Ctl.OverlayTabRect(I);
+    C.Brush.Style := bsSolid;
+    if Ctl.OverlayTabSelected(I) then
+    begin
+      C.Brush.Color := RGBToColor(201, 162, 74);
+      C.Pen.Color := RGBToColor(150, 118, 46);
+      C.Font.Color := RGBToColor(30, 19, 38);
+    end
+    else
+    begin
+      C.Brush.Color := RGBToColor(30, 19, 38);
+      C.Pen.Color := RGBToColor(110, 90, 46);
+      C.Font.Color := Bone;
+    end;
+    C.RoundRect(R.Left, R.Top, R.Right, R.Bottom, Round(8 * K), Round(8 * K));
+    C.Brush.Style := bsClear;
+    C.Font.Size := Max(9, Round(12 * K));
+    C.Font.Style := [fsBold];
+    S := Ctl.OverlayTabCaption(I);
+    C.TextOut(R.Left + ((R.Right - R.Left) - C.TextWidth(S)) div 2,
+      R.Top + ((R.Bottom - R.Top) - C.TextHeight(S)) div 2, S);
+  end;
+
   { the rows }
   N := Ctl.OverlayRowCount;
   for I := 0 to N - 1 do
@@ -221,7 +315,14 @@ begin
     C.Brush.Style := bsClear;
     { the little card picture (the records page has none) }
     X := R.Left + Round(10 * K);
-    if Row.Art >= 0 then
+    if Row.Preview > 0 then
+    begin
+      IconH := RowH - 8;
+      IconR := Rect(R.Left + 6, R.Top + 4, R.Left + 6 + Round(IconH * 164 / 232), R.Top + 4 + IconH);
+      DrawPreview(C, IconR, Row.Preview, K);
+      X := IconR.Right + Round(10 * K);
+    end
+    else if Row.Art >= 0 then
     begin
       IconH := RowH - 8;
       IconR := Rect(R.Left + 6, R.Top + 4, R.Left + 6 + Round(IconH * 164 / 232), R.Top + 4 + IconH);
@@ -320,6 +421,19 @@ begin
   C.Font.Style := [fsBold];
   C.Font.Color := Gold;
   C.TextOut(R.Left, R.Top + ((R.Bottom - R.Top) - C.TextHeight('Ag')) div 2, Ctl.OverlayFooter);
+  if Ctl.OverlayExtraCaption <> '' then              { a button beside Leave: the Store's Style }
+  begin
+    R := Ctl.OverlayExtraRect;
+    C.Brush.Style := bsSolid;
+    C.Brush.Color := RGBToColor(42, 29, 54);
+    C.Pen.Color := RGBToColor(110, 90, 46);
+    C.RoundRect(R.Left, R.Top, R.Right, R.Bottom, Round(8 * K), Round(8 * K));
+    C.Brush.Style := bsClear;
+    C.Font.Color := Bone;
+    S := Ctl.OverlayExtraCaption;
+    C.TextOut(R.Left + ((R.Right - R.Left) - C.TextWidth(S)) div 2,
+      R.Top + ((R.Bottom - R.Top) - C.TextHeight(S)) div 2, S);
+  end;
   R := Ctl.OverlayLeaveRect;
   C.Brush.Style := bsSolid;
   C.Brush.Color := RGBToColor(42, 29, 54);

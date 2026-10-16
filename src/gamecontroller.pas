@@ -23,7 +23,7 @@ interface
 uses
   SysUtils, Types, Math, Cards, TriPeaks, Inventory, Session, Sound, Anim, Stage,
   NewGameAnim, Vampires, Story, Campaign, Duel, DuelSession, DuelInfo, Scenes,
-  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules, Trophies;
+  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules, Trophies, Cosmetics;
 
 const
   { The table is laid out on a fixed design grid and scaled to fit. }
@@ -83,7 +83,7 @@ type
 
   { The Store (Fenwick's goods) and the tray of your own special cards are two
     overlays drawn over the table; both are a list of rows with a button. }
-  TOverlayKind = (okNone, okStore, okCards, okRecords, okSlots, okTrophies);
+  TOverlayKind = (okNone, okStore, okCards, okRecords, okSlots, okTrophies, okStyle);
 
   TOverlayRow = record
     Title, Detail: string;
@@ -95,6 +95,7 @@ type
     Header: Boolean;                { a section heading, not a row }
     Button2Text: string;            { a second, smaller button to the left of the first (a saved game's Delete) }
     Button2Enabled: Boolean;
+    Preview: Integer;               { 0 none; else Ord(kind) * 16 + item + 1: a small picture drawn in code (Style page) }
   end;
 
 const
@@ -105,6 +106,7 @@ const
     trophy's number, or ArtTrophyEmpty for a trophy not earned yet (an empty tile). }
   ArtTrophy0 = StoreGoodCount;
   ArtTrophyEmpty = StoreGoodCount + TrophyCount;
+  StyleTabHeight = 34;                       { the tabs on the Style page }
   OverlayArtCount = ArtTrophyEmpty;          { pictures to load: the goods and the trophies }
 
 type
@@ -133,6 +135,7 @@ type
     FAllowBottomPanel: Boolean;
     FToast: string;
     FTrophies: TTrophies;
+    FStyleTab: Integer;        { which kind the Style page shows: 0 backs, 1 cloths, 2 moons }
     FNews: string;             { 'Trophy earned: ...' until the next tap on the table }
     FDeleteAsk: Integer;       { the slot row whose Delete is waiting for an answer (-1 = none) }
     FRulesShow: Boolean;       { the rules are being shown (by the front end) }
@@ -160,6 +163,10 @@ type
     FOffX, FOffY: Integer;
     procedure Changed;
     procedure EarnTrophy(T: TTrophy);
+    function StyleAvailable(K: TCosmeticKind; I: Integer): Boolean;
+    function StyleChoice(K: TCosmeticKind): Integer;
+    function StyleRow(I: Integer): TOverlayRow;
+    procedure StyleAction(I: Integer);
     function DeleteText: string;
     procedure SessionWon(BestStreak, Misses: Integer);
     procedure DuelWon(V, TotalLost, BestStreak, Misses: Integer; Kill: Boolean);
@@ -305,6 +312,11 @@ type
     function TrophyLayout: TTrophyLayout;      { the shelf's rectangles (empty with no panel) }
     function TrophyArt(I: Integer): Integer;   { the picture slot to draw for shelf slot I }
     procedure ActionOpenTrophies;
+    { ---- Style: card backs, table cloths and the colour of the moon ---- }
+    procedure ActionOpenStyle;
+    function StyleBack: Integer;               { the choice in use (0 = the original look) }
+    function StyleCloth: Integer;
+    function StyleMoon: Integer;
     procedure ActionAnswerDelete(ADelete: Boolean);      { the question in UiState.AskDelete }
     procedure ActionRulesClosed;                         { the rules shown for UiState.ShowRules were dismissed }
     function RulesSectionCount: Integer;
@@ -332,6 +344,14 @@ type
     function OverlayRowRect(I: Integer): TRect;
     function OverlayButtonRect(I: Integer): TRect;
     function OverlayButton2Rect(I: Integer): TRect;   { the second button, left of the first }
+    { Tabs above the rows (the Style page: card backs, table cloths, the moon) and a
+      button beside Close (the Store: Style). }
+    function OverlayTabCount: Integer;
+    function OverlayTabRect(I: Integer): TRect;
+    function OverlayTabCaption(I: Integer): string;
+    function OverlayTabSelected(I: Integer): Boolean;
+    function OverlayExtraCaption: string;             { '' = no button }
+    function OverlayExtraRect: TRect;
     function OverlayLeaveRect: TRect;
     function OverlayFooterRect: TRect;
     { Drawing the table: is this card shown face up (free, or Seer's eye)? is it
@@ -435,11 +455,11 @@ const
 
 function TGameController.MenuButtonCount: Integer;
 begin
-  if FCanQuit then Result := 6 else Result := 5;
+  if FCanQuit then Result := 7 else Result := 6;
 end;
 
 { 0 Campaign, 1 Free Play, 2 Save game, 3 Load game (those two share a row),
-  4 Rules, 5 Quit (Quit shares the Rules row). }
+  4 Rules, 5 Style (those two share a row), then Quit. }
 function TGameController.MenuButtonCaption(I: Integer): string;
 begin
   case I of
@@ -448,7 +468,8 @@ begin
     2: Result := 'Save game';
     3: Result := 'Load game';
     4: Result := 'Rules';
-    5: Result := 'Quit';
+    5: Result := 'Style';
+    6: Result := 'Quit';
   else
     Result := '';
   end;
@@ -474,6 +495,7 @@ var
   BW, BH, Gap, Top, X, Row, Rows, HalfW: Integer;
 begin
   Rows := 4;
+  if FCanQuit then Rows := 5;
   BW := Min(380, FVW * 62 div 100);
   BH := Max(34, Min(56, FVH * 7 div 100));
   Gap := BH div 4;
@@ -485,12 +507,13 @@ begin
   case I of
     0, 1: Row := I;
     2, 3: Row := 2;
+    4, 5: Row := 3;
   else
-    Row := 3;
+    Row := 4;                                  { Quit, on its own row }
   end;
-  if FCanQuit and (I = 4) then
+  if I = 4 then
     Result := Rect(X, Top + Row * (BH + Gap), X + HalfW, Top + Row * (BH + Gap) + BH)
-  else if FCanQuit and (I = 5) then
+  else if I = 5 then
     Result := Rect(X + BW - HalfW, Top + Row * (BH + Gap), X + BW, Top + Row * (BH + Gap) + BH)
   else if I = 2 then
     Result := Rect(X, Top + Row * (BH + Gap), X + HalfW, Top + Row * (BH + Gap) + BH)
@@ -550,7 +573,8 @@ begin
       FRulesShow := True;               { the front end shows them }
       Changed;
     end;
-    5:
+    5: ActionOpenStyle;
+    6:
       if FCanQuit and Assigned(FOnQuit) then FOnQuit();
   end;
 end;
@@ -646,6 +670,7 @@ begin
   Result.ButtonEnabled := False;
   Result.Button2Text := '';
   Result.Button2Enabled := False;
+  Result.Preview := 0;
   Result.Art := -1;
   Result.Selected := False;
   Result.Header := False;
@@ -1511,7 +1536,7 @@ end;
 procedure TGameController.KeyPress(IsEscape: Boolean);
 begin
   if FRulesShow or (FDeleteAsk >= 0) then Exit;
-  if FMenuOpen and (FOverlay = okSlots) then
+  if FMenuOpen and (FOverlay in [okSlots, okStyle]) then
   begin
     if IsEscape then ActionCloseOverlay;     { back to the menu }
     Exit;
@@ -1820,7 +1845,7 @@ end;
 
 procedure TGameController.ActionCloseOverlay;
 begin
-  if FMenuOpen and (FOverlay <> okSlots) then Exit;
+  if FMenuOpen and not (FOverlay in [okSlots, okStyle]) then Exit;
   if FOverlay = okNone then Exit;
   if (FOverlay = okStore) then
   begin
@@ -1868,6 +1893,7 @@ begin
     okRecords: Result := 10 + 2;             { two headings, ten records }
     okSlots: if FSlotsSave then Result := 4 else Result := 8;   { headings and three slots a mode }
     okTrophies: Result := TrophyCount;
+    okStyle: Result := CosmeticsPerKind;
   else
     Result := 0;
   end;
@@ -1888,6 +1914,7 @@ begin
   Result.ButtonEnabled := False;
   Result.Button2Text := '';
   Result.Button2Enabled := False;
+  Result.Preview := 0;
   Result.Art := I;
   Result.Selected := (FOverlay = okStore) and (I = FSelected);
   Result.Header := False;
@@ -1900,6 +1927,11 @@ begin
   if FOverlay = okSlots then
   begin
     Result := SlotRow(I);
+    Exit;
+  end;
+  if FOverlay = okStyle then
+  begin
+    Result := StyleRow(I);
     Exit;
   end;
   if FOverlay = okTrophies then
@@ -1976,6 +2008,7 @@ begin
     okRecords: Result := 'Your records';
     okSlots: if FSlotsSave then Result := 'Save game' else Result := 'Load game';
     okTrophies: Result := 'Your trophies';
+    okStyle: Result := 'Style';
   else
     Result := '';
   end;
@@ -1989,6 +2022,8 @@ begin
       Result := 'Pick a card to use it. The Wild card and Wood Stake then ask you to tap a free card. Dimmed cards would do nothing now.';
     okRecords:
       Result := 'Your best results on this device. Only won hands count.';
+    okStyle:
+      Result := 'How the cards, the table and the moon look. It never changes how a hand plays.';
     okTrophies:
       Result := 'Keepsakes from the vampires, and from how you play. They stay with you, even if you start the campaign again.';
     okSlots:
@@ -2014,6 +2049,8 @@ end;
 function TGameController.OverlayFooter: string;
 begin
   if FOverlay = okStore then
+    Result := Format('Coins: %d', [FSession.Inventory.Coins])
+  else if FOverlay = okStyle then
     Result := Format('Coins: %d', [FSession.Inventory.Coins])
   else if FOverlay = okTrophies then
     Result := Format('%d of %d earned', [FTrophies.Count, TrophyCount])
@@ -2081,9 +2118,11 @@ begin
   begin
     SpeechH := 72;
     if (FVH < 420) or (FVW < 520) then SpeechH := 90;
-    if (FOverlay = okRecords) or (FOverlay = okSlots) or (FOverlay = okTrophies) then SpeechH := 62;
+    if FOverlay in [okRecords, okSlots, okTrophies, okStyle] then SpeechH := 62;
+    if (FOverlay = okStyle) and ((FVH < 420) or (FVW < 520)) then SpeechH := 90;
     L.Speech := Rect(L.X0, L.Panel.Top + Pad, L.X1, L.Panel.Top + Pad + SpeechH);
     L.RowsTop := L.Speech.Bottom + Pad;
+    if FOverlay = okStyle then L.RowsTop := L.RowsTop + StyleTabHeight + 6;     { the tabs sit between }
   end;
   L.Leave := Rect(L.X1 - 130, L.Panel.Bottom - Pad - LeaveH, L.X1, L.Panel.Bottom - Pad);
   L.Footer := Rect(L.X0, L.Leave.Top, L.Leave.Left - Pad, L.Leave.Bottom);
@@ -2128,6 +2167,50 @@ var
 begin
   L := Layout;
   Result := Rect(L.X0, L.RowsTop + I * L.RowH, L.X1, L.RowsTop + (I + 1) * L.RowH - 4);
+end;
+
+function TGameController.OverlayTabCount: Integer;
+begin
+  if FOverlay = okStyle then Result := CosmeticKindCount else Result := 0;
+end;
+
+function TGameController.OverlayTabRect(I: Integer): TRect;
+var
+  L: TOverlayLayout;
+  W: Integer;
+begin
+  L := Layout;
+  W := (L.X1 - L.X0 - 2 * 8) div CosmeticKindCount;
+  Result := Rect(L.X0 + I * (W + 8), L.Speech.Bottom + 6, L.X0 + I * (W + 8) + W,
+    L.Speech.Bottom + 6 + StyleTabHeight);
+end;
+
+function TGameController.OverlayTabCaption(I: Integer): string;
+begin
+  case I of
+    0: Result := 'Card backs';
+    1: Result := 'Table cloths';
+  else
+    Result := 'The moon';
+  end;
+end;
+
+function TGameController.OverlayTabSelected(I: Integer): Boolean;
+begin
+  Result := (FOverlay = okStyle) and (I = FStyleTab);
+end;
+
+function TGameController.OverlayExtraCaption: string;
+begin
+  if (FOverlay = okStore) and not IntroActive then Result := 'Style' else Result := '';
+end;
+
+function TGameController.OverlayExtraRect: TRect;
+var
+  L: TOverlayLayout;
+begin
+  L := Layout;
+  Result := Rect(L.Leave.Left - 8 - 110, L.Leave.Top, L.Leave.Left - 8, L.Leave.Bottom);
 end;
 
 function TGameController.OverlayButton2Rect(I: Integer): TRect;
@@ -2195,6 +2278,11 @@ begin
     SlotAction(I);
     Exit;
   end;
+  if FOverlay = okStyle then
+  begin
+    StyleAction(I);
+    Exit;
+  end;
   if FOverlay = okStore then
   begin
     if not Stocked(I) then
@@ -2246,6 +2334,18 @@ begin
     ActionCloseOverlay;
     Exit;
   end;
+  if (OverlayExtraCaption <> '') and PtInRect(OverlayExtraRect, P) then
+  begin
+    ActionOpenStyle;                   { Fenwick's Style page }
+    Exit;
+  end;
+  for I := 0 to OverlayTabCount - 1 do
+    if PtInRect(OverlayTabRect(I), P) then
+    begin
+      FStyleTab := I;
+      Changed;
+      Exit;
+    end;
   if IntroActive then
   begin
     AdvanceIntro;
@@ -2489,6 +2589,129 @@ begin
   else Result := ArtTrophyEmpty;
 end;
 
+{ ---- Style ---- }
+
+{ Is it the player's? The original look always is; a trophy unlocks one; the rest are bought. }
+function TGameController.StyleAvailable(K: TCosmeticKind; I: Integer): Boolean;
+var
+  T: Integer;
+begin
+  if I <= 0 then Exit(True);
+  T := CosmeticTrophy(K, I);
+  if T <> NoTrophy then Result := FTrophies.Has(TTrophy(T))
+  else Result := FSession.Inventory.BoughtCosmetic(K, I);
+end;
+
+{ The choice in use: what was picked, if the player still has it (a loaded save or an
+  edited file may not), else the original. }
+function TGameController.StyleChoice(K: TCosmeticKind): Integer;
+begin
+  case K of
+    ckBack: Result := CosmeticIndexOf(K, FSettings.BackKey);
+    ckCloth: Result := CosmeticIndexOf(K, FSettings.ClothKey);
+  else
+    Result := CosmeticIndexOf(K, FSettings.MoonKey);
+  end;
+  if not StyleAvailable(K, Result) then Result := 0;
+end;
+
+function TGameController.StyleBack: Integer;
+begin
+  Result := StyleChoice(ckBack);
+end;
+
+function TGameController.StyleCloth: Integer;
+begin
+  Result := StyleChoice(ckCloth);
+end;
+
+function TGameController.StyleMoon: Integer;
+begin
+  Result := StyleChoice(ckMoon);
+end;
+
+procedure TGameController.ActionOpenStyle;
+begin
+  if Animating and FInScene then Exit;
+  if Animating then SkipDeal;
+  if not FMenuOpen then CloseModes;
+  FOverlay := okStyle;
+  Changed;
+end;
+
+function TGameController.StyleRow(I: Integer): TOverlayRow;
+var
+  K: TCosmeticKind;
+  Key: string;
+  T: Integer;
+begin
+  Result.Title := '';
+  Result.Detail := '';
+  Result.Aside := '';
+  Result.ButtonText := '';
+  Result.ButtonEnabled := False;
+  Result.Button2Text := '';
+  Result.Button2Enabled := False;
+  Result.Art := -1;
+  Result.Selected := False;
+  Result.Header := False;
+  K := TCosmeticKind(FStyleTab);
+  Result.Preview := Ord(K) * 16 + I + 1;
+  Key := CosmeticStoryKey(K, I);
+  Result.Title := FStory.StyleName(Key);
+  Result.Detail := FStory.StyleLine(Key);
+  T := CosmeticTrophy(K, I);
+  if StyleChoice(K) = I then
+  begin
+    Result.Selected := True;
+    Result.Aside := '';
+    Result.ButtonText := 'In use';
+    Result.ButtonEnabled := False;
+  end
+  else if StyleAvailable(K, I) then
+  begin
+    Result.ButtonText := 'Use';
+    Result.ButtonEnabled := True;
+  end
+  else if T <> NoTrophy then
+  begin
+    Result.Detail := 'Earned with ' + FStory.TrophyName(TrophyKeys[TTrophy(T)]) + '.';
+    Result.Aside := 'locked';
+  end
+  else
+  begin
+    Result.Aside := Format('%d coins', [CosmeticCost(K, I)]);
+    Result.ButtonText := 'Buy';
+    Result.ButtonEnabled := FSession.Inventory.CanBuyCosmetic(K, I);
+  end;
+end;
+
+{ Buy or use item I of the page's kind. Buying takes the price and uses it at once. }
+procedure TGameController.StyleAction(I: Integer);
+var
+  K: TCosmeticKind;
+  Name: string;
+begin
+  K := TCosmeticKind(FStyleTab);
+  Name := FStory.StyleName(CosmeticStoryKey(K, I));
+  if not StyleAvailable(K, I) then
+  begin
+    if not FSession.Inventory.BuyCosmetic(K, I) then Exit;
+    FSession.SaveNow;
+    FToast := 'Bought ' + Name + '.';
+  end
+  else
+    FToast := Name + ' is now in use.';
+  case K of
+    ckBack: FSettings.BackKey := CosmeticKey(K, I);
+    ckCloth: FSettings.ClothKey := CosmeticKey(K, I);
+  else
+    FSettings.MoonKey := CosmeticKey(K, I);
+  end;
+  FSettings.Save;
+  Changed;
+end;
+
 procedure TGameController.ActionOpenTrophies;
 begin
   if FMenuOpen then Exit;
@@ -2522,6 +2745,7 @@ begin
   Result.ButtonEnabled := False;
   Result.Button2Text := '';
   Result.Button2Enabled := False;
+  Result.Preview := 0;
   Result.Art := -1;
   Result.Selected := False;
   Result.Header := False;

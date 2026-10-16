@@ -5,7 +5,7 @@ program testrules;
 
 {$mode objfpc}{$H+}
 
-uses SysUtils, Classes, TriPeaks, Inventory, Specials, Vampires, Duel, Story, Rules
+uses SysUtils, Classes, TriPeaks, Inventory, Specials, Vampires, Duel, Story, Rules, Cosmetics
   {$IFDEF PAS2JS}, JsCompat{$ENDIF};
 
 var
@@ -63,6 +63,7 @@ begin
     Check(Pos('Wild card', RulesBody(8, St)) > 0, 'and how to claim it');
     Check(Pos('Records', Text) > 0, 'the Records');
     Check(Pos(St.TrophyName('flawless'), Text) > 0, 'the trophies are listed by name');
+    Check(Pos(Format('%d coins for a card back', [BackPrice]), Text) > 0, 'the Style prices');
     Check(Pos('Erase everything', RulesBody(10, St)) > 0, 'and what clears them');
     Check(Pos('undo card', Text) > 0, 'undo cards');
     Check(Pos(Format('%d coins', [WinCoins]), Text) > 0, 'the Free Play pay');

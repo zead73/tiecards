@@ -126,6 +126,24 @@ Ideas to review later.
       `web/README.md` (2026-10-16).
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
+## Style: cosmetics (2026-10-16)
+
+- [x] **Style, from the user's choices** (card backs, table cloths and the moon colour; a mix of
+      bought and earned; a Style page reached from the Store and the start menu). Four of each
+      kind: the first is the original look (free, and pinned to the old colour numbers by a
+      test), two are bought at fixed list prices (back 60, cloth 80, moon 50: never discounted,
+      buyable any time) and the last is unlocked by a vampire's trophy (Lucien -> back, Carmilla
+      -> cloth, the Count -> moon). `src/cosmetics.pas` holds the table and the colours (plain
+      0xRRGGBB); what is bought is `Style.<kind>.<key>=1` in the inventory (so it rewinds with a
+      campaign slot and Erase everything clears it, Restart campaign keeps it), the choice is
+      `Back` / `Cloth` / `Moon` keys in settings.ini and falls back to the original if no longer
+      owned. The page has three tabs and a small picture drawn in code for every row; the Store
+      has a Style button beside Leave; the menu is Campaign / Free Play / Save|Load / Rules|Style /
+      Quit. Moons are `assets/house/house_<moon>.png` (tools/make_house.py also writes them; the
+      original house.png stays byte-identical, about 225 KB per moon). Names and lines are
+      in `[style]` in story.ini (the user may edit). Tests: `tests/testcosmetics.pas` and
+      `TestStyle`. Prices and the choice of palettes are placeholders to adjust.
+
 ## Delete saved games (2026-10-16)
 
 - [x] A Delete button beside every used slot on the Save and Load pages (Free Play and

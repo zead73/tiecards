@@ -53,7 +53,18 @@ def bat(x, y, s=1.0, rot=0):
             'd="M -22 0 Q -12 -14 -3 -3 Q 0 -8 3 -3 Q 12 -14 22 0 Q 12 -5 6 3 Q 0 6 -6 3 Q -12 -5 -22 0 Z"/>')
 
 
-def build():
+# the moon's colours: (glow, disc, craters, ring or None). The first is the original.
+MOONS = {
+    "pale": ("#f4ecd4", "#f1e8cf", "#d9ceb0", None),
+    "blood": ("#e8604f", "#cf3b33", "#a82a26", None),
+    "harvest": ("#f8bd50", "#f4b64f", "#dc9a3a", None),
+    "eclipse": ("#b9b2d4", "#1b1527", "#2a2140", "#d4cde8"),
+}
+
+
+def build(moon="pale"):
+    glow, disc, crater, ring = MOONS[moon]
+    ring_svg = f'<circle cx="1230" cy="200" r="82" fill="none" stroke="{ring}" stroke-width="5"/>' if ring else ""
     rnd = random.Random(1313)
     stars = ""
     for _ in range(170):
@@ -77,7 +88,7 @@ def build():
     <stop offset="0.75" stop-color="#43183a"/><stop offset="1" stop-color="#6b2234"/>
   </linearGradient>
   <radialGradient id="moonglow" cx="0.5" cy="0.5" r="0.5">
-    <stop offset="0" stop-color="#f4ecd4" stop-opacity="0.55"/><stop offset="1" stop-color="#f4ecd4" stop-opacity="0"/>
+    <stop offset="0" stop-color="{glow}" stop-opacity="0.55"/><stop offset="1" stop-color="{glow}" stop-opacity="0"/>
   </radialGradient>
   <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="{AMBER}" stop-opacity="0.8"/><stop offset="1" stop-color="{AMBER}" stop-opacity="0"/>
@@ -93,8 +104,9 @@ def build():
 {stars}
 <!-- the moon -->
 <circle cx="1230" cy="200" r="190" fill="url(#moonglow)"/>
-<circle cx="1230" cy="200" r="78" fill="#f1e8cf"/>
-<circle cx="1206" cy="180" r="14" fill="#d9ceb0"/><circle cx="1256" cy="222" r="19" fill="#d9ceb0"/><circle cx="1240" cy="168" r="8" fill="#d9ceb0"/>
+<circle cx="1230" cy="200" r="78" fill="{disc}"/>
+<circle cx="1206" cy="180" r="14" fill="{crater}"/><circle cx="1256" cy="222" r="19" fill="{crater}"/><circle cx="1240" cy="168" r="8" fill="{crater}"/>
+{ring_svg}
 <!-- the three peaks -->
 <path d="M 0 700 L 0 520 L 110 450 L 250 330 L 330 400 L 430 470 L 540 380 L 640 300 L 800 190 L 930 300 L 1010 380 L 1110 450 L 1200 420 L 1330 330 L 1440 430 L 1520 470 L 1600 520 L 1600 700 Z" fill="#241640"/>
 <path d="M 250 330 L 215 372 L 240 366 L 258 384 L 276 366 L 296 372 Z M 800 190 L 752 250 L 782 244 L 800 266 L 822 242 L 852 252 Z M 1330 330 L 1296 372 L 1318 366 L 1334 384 L 1350 366 L 1372 372 Z" fill="#b9b2d4" opacity="0.55"/>
@@ -145,12 +157,15 @@ def build():
 
 
 def main():
-    png = subprocess.run(["rsvg-convert", "-w", str(W), "-h", str(H)], input=build().encode(),
-                         stdout=subprocess.PIPE, check=True).stdout
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "wb") as f:
-        f.write(png)
-    print("wrote %s" % os.path.normpath(OUT))
+    for moon in MOONS:
+        # the original is house.png; the others are house_<moon>.png (the Style page's moons)
+        path = OUT if moon == "pale" else OUT.replace("house.png", "house_%s.png" % moon)
+        png = subprocess.run(["rsvg-convert", "-w", str(W), "-h", str(H)], input=build(moon).encode(),
+                             stdout=subprocess.PIPE, check=True).stdout
+        with open(path, "wb") as f:
+            f.write(png)
+        print("wrote %s" % os.path.normpath(path))
 
 
 if __name__ == "__main__":
