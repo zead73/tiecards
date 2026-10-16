@@ -12,6 +12,7 @@ var
   StockN: Integer;
   Wrap: Boolean;
   FeedEvery: Integer;                  { 0 = no hunger }
+  FeedCap: Integer;                    { 0 = no cap; else he feeds at most this many times in a hand }
   SkipFeed: Integer;                   { Iron Spoon: how many of his first feedings are skipped (the relic skips 1) }
   BreakOn: Boolean;                    { Locksmith's Pick: one chained card per hand may be played anyway }
   Seen: specialize TDictionary<QWord, Boolean>;
@@ -72,7 +73,9 @@ var Fed: Integer;
 begin
   if FeedEvery > 0 then
   begin
-    Result := StockN - Drawn - (Drawn div FeedEvery);
+    Fed := Drawn div FeedEvery;
+    if (FeedCap > 0) and (Fed > FeedCap) then Fed := FeedCap;
+    Result := StockN - Drawn - Fed;
     if SkipFeed > 0 then
     begin
       Fed := Drawn div FeedEvery;                               { feedings that would have happened }
@@ -175,10 +178,10 @@ begin
   end;
 end;
 
-procedure Run(const Name: string; AWrap: Boolean; AStock, Chains, Feed, N: Integer; ASkip: Integer = 0; APick: Boolean = False);
+procedure Run(const Name: string; AWrap: Boolean; AStock, Chains, Feed, N: Integer; ASkip: Integer = 0; APick: Boolean = False; ACap: Integer = 0);
 var K, WinP, WinG, Waste, Unknown: Integer;
 begin
-  Wrap := AWrap; StockN := AStock; FeedEvery := Feed; SkipFeed := ASkip; BreakOn := APick;
+  Wrap := AWrap; StockN := AStock; FeedEvery := Feed; SkipFeed := ASkip; BreakOn := APick; FeedCap := ACap;
   WinP := 0; WinG := 0; Unknown := 0;
   RandSeed := 4242;
   for K := 1 to N do
@@ -196,6 +199,13 @@ begin
   Layout;
   Seen := specialize TDictionary<QWord, Boolean>.Create;
   NodeCap := 3000000;
+  Run('Alaric: no wrap, 23 stock, feeds every 4', False, 23, 0, 4, 500);
+  Run('A: he feeds at most once a hand', False, 23, 0, 4, 500, 0, False, 1);
+  Run('B: he feeds at most twice a hand', False, 23, 0, 4, 500, 0, False, 2);
+  Run('C: he feeds every 8th draw', False, 23, 0, 8, 500);
+  Run('D: King and Ace wrap in his hands', True, 23, 0, 4, 500);
+  Run('E: wrap, and he skips the first feeding', True, 23, 0, 4, 500, 1);
+  Run('F: no hunger at all (the ceiling)', False, 23, 0, 0, 500);
   Run('Lucien: the ordinary rules', True, 23, 0, 0, 500);
   Run('Carmilla: wrap, 20 stock, 3 chains', True, 20, 3, 0, 500);
   Run('Alaric: no wrap, 23 stock, feeds every 4', False, 23, 0, 4, 500);
