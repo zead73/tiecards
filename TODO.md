@@ -304,9 +304,14 @@ Ideas to review later.
       live in `src/inventory.pas`, `src/vampires.pas` and `src/specials.pas`; the
       player's Rules text (`src/rules.pas`) reads them, so it follows any change.
       (The 2-coin missed-move penalty and its sting sound are approved for now.)
-- [ ] Listen to the duel sounds on Windows and Linux (bell toll, fatal blow, card
-      deal flicks) and tell me if any need changing. The deal flicks can trail
-      the cards a little on Linux because the sound player takes a moment to start.
+      2026-10-16: the user has been playing and is happy so far; KEEP OPEN until
+      Andrea's feedback arrives.
+- [x] Duel sounds listened to on Linux and Windows: the user says they all sound perfect
+      (2026-10-16). (The deal flicks can trail the cards a little on Linux because the
+      sound player takes a moment to start.)
+- [x] Windows build with the newest features (start menu, save slots, tricks, silver
+      cross, Rules, icon) works perfectly (user, 2026-10-16).
+- [x] The user's LXQt menu entry now shows the icon (2026-10-16).
 - [x] Windows 11 check: the user ran the exe on Andrea's machine and it works (2026-10-08). Which build, and whether the scene font, sound and icon were looked at, was not said.
 - [x] App icon for the Windows exe: the card-back moon, embedded as MAINICON
       (`assets/icon/tiecards.ico`, made by `tools/make-icon.sh`; small sizes are a
