@@ -38,6 +38,7 @@ begin
   ASettings.WrapUnlocked := False;       { and his Open wrap and Full deck cards are not in stock yet }
   ASettings.StockUnlocked := False;
   ASettings.ResetStyle;                  { the original look (what was bought is cleared with the inventory) }
+  ASettings.ResetRelics;                 { and no relics equipped }
   ASettings.Save;
   ARecords.Reset;                        { personal records too }
   ATrophies.Reset;                       { and the trophies (Restart campaign keeps them) }

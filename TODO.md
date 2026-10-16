@@ -126,6 +126,29 @@ Ideas to review later.
       `web/README.md` (2026-10-16).
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
+## Relics (2026-10-16)
+
+- [x] **Relics, from the user's answers** (role: make the hard vampires easier; slots grow;
+      Locket and Moonstone can be bought or earned, the first three only bought). Five:
+      Garlic Wreath (first bitten card of a hand free), Locksmith's Pick (one chained card a
+      hand can be played with its neighbour still there; counts as a move for stuck, hints and
+      missed moves), Iron Spoon (the Count's first feeding of a hand is skipped), Steady
+      Locket (first missed move free), Moonstone (first Show move free). Slots = 1 + vampire
+      trophies held (cap 4). Prices 80 / 160 / 160 / 120 / 100 (placeholders); Locket also from
+      the perfect-hand trophy, Moonstone also from Carmilla's. `src/relics.pas`; owned relics
+      are `Relic.<key>` in the inventory (rewind with a campaign slot), the equipped list is
+      `Relics=` in settings.ini and is trimmed on every read to what is owned and fits. A hand is
+      dealt with the relics equipped at that moment (also the hand on the table before the first
+      move), keeps them when saved, and the game's own state records them (`feedskip`, `breaks`,
+      history code `K`). Garlic and Locket work from counts (charged = raw - 1), so undo needs
+      no new state. Fenwick's Store has Style and Relics buttons beside Leave. Measured with
+      `tools/trick-solver.pas` (perfect play / plain player): Carmilla 75.6 / 18.2 -> with the
+      Pick 88.4 / 27.0; Alaric 48.0 / 8.4 -> with the Spoon 55.6 / 10.4 (about one extra stock
+      card; skipping two feedings or feeding every 6th draw gives the same, because the last
+      feeding takes the final card). The Spoon is the weakest: ask the user before making it
+      stronger. Garlic only saves coins against Lucien, who is already the easy one. Tests:
+      `tests/testrelics.pas`, the relic cases in `testtripeaks`, `TestRelicsPage`.
+
 ## Style: cosmetics (2026-10-16)
 
 - [x] **Style, from the user's choices** (card backs, table cloths and the moon colour; a mix of
@@ -218,8 +241,7 @@ Ideas to review later.
       are unused by the duel scenes.
 - [x] **Mid-hand vampire effects.** Done 2026-10-12: bites, chains and hunger (see the
       tricks entry), and the silver cross (2026-10-13).
-- [ ] **Items.** Jokers, gems, or similar things you can buy or win. Fixed
-      prices and deterministic rewards only: no gambling mechanics.
+- [x] **Items.** Done as trophies, Style and relics (2026-10-16). Relics: see the entry above.
 
 - [x] **High scores.** Done as personal Records (see the entry near the top).
 - [x] **Load / save game.** Done: the hand is saved automatically after every

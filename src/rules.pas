@@ -12,7 +12,7 @@ unit Rules;
 interface
 
 uses
-  SysUtils, TriPeaks, Specials, Inventory, Vampires, Duel, Story, HandFile, Trophies, Cosmetics;
+  SysUtils, TriPeaks, Specials, Inventory, Vampires, Duel, Story, HandFile, Trophies, Cosmetics, Relics;
 
 function RulesSectionCount: Integer;
 function RulesHeading(I: Integer; AStory: TStory): string;
@@ -27,7 +27,7 @@ const
 implementation
 
 const
-  Sections = 13;
+  Sections = 14;
   RankNames: array[0..VampireCount - 1] of string = ('Jack', 'Queen', 'King');
 
 function RulesSectionCount: Integer;
@@ -50,6 +50,7 @@ begin
     9: Result := 'Saving your game';
     10: Result := 'Trophies';
     11: Result := 'Style';
+    12: Result := 'Relics';
   else
     Result := 'Free Play and Records';
   end;
@@ -223,6 +224,25 @@ begin
     'Pick what you own with Use. You can change your style at any time, even in the middle of a hand. What you bought goes with your coins: loading a Campaign save takes it back to what you had then, and Erase everything clears it.';
 end;
 
+function BodyRelics(AStory: TStory): string;
+var
+  R: TRelic;
+  List: string;
+begin
+  List := '';
+  for R := Low(TRelic) to High(TRelic) do
+  begin
+    if List <> '' then List := List + RulesBreak;
+    List := List + Format('%s (%d coins): %s', [AStory.RelicName(RelicKey(R)), RelicPrice(R), AStory.RelicLine(RelicKey(R))]);
+  end;
+  Result :=
+    'Relics are small helps you keep, to take the edge off the hard vampires. Buy them from Fenwick (the Relics button in the Store). Prices are fixed and nothing about them is random.' + RulesBreak +
+    List + RulesBreak +
+    'You start with one slot, and every vampire you kill (the trophy on the shelf) gives you another. Equip a relic to put it in a slot; remove one to make room. You keep what you buy.' + RulesBreak +
+    'The Steady Locket is also given to you by The Steady Hand trophy, and the Moonstone by Carmilla''s trophy, so you can earn them instead of buying them.' + RulesBreak +
+    'A relic works in every hand dealt while it is equipped, and in the hand on the table too if you have not made a move yet. A hand keeps the relics it began with, even if you save and load it. The Pick, the Spoon and the Wreath only matter against a vampire''s trick, so in Free Play they do nothing.';
+end;
+
 function BodyFree(AStory: TStory): string;
 begin
   Result :=
@@ -249,6 +269,7 @@ begin
     9: Result := BodySaving(AStory);
     10: Result := BodyTrophies(AStory);
     11: Result := BodyStyle(AStory);
+    12: Result := BodyRelics(AStory);
   else
     Result := BodyFree(AStory);
   end;

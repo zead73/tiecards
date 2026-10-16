@@ -608,8 +608,9 @@ var
 const
   Suits: array[0..3] of string = ('clubs', 'diamonds', 'hearts', 'spades');
   Vamps: array[0..2] of string = ('jack', 'queen', 'king');
-  SpecialArt: array[0..13] of string = ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint',
-    'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless');
+  SpecialArt: array[0..19] of string = ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint',
+    'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless',
+    '', 'relic_garlic', 'relic_pick', 'relic_spoon', 'relic_locket', 'relic_moonstone');
 begin
   Pairs := TJSArray.new;
   for Su := 0 to 3 do
@@ -638,11 +639,12 @@ begin
   Pairs.push('assets/win/win_screen.png');
   Pairs.push('shopkeeper');
   Pairs.push('assets/shopkeeper/shopkeeper.png');
-  for V := 0 to 13 do
-  begin
-    Pairs.push('special_' + SpecialArt[V]);
-    Pairs.push('assets/specials/special_' + SpecialArt[V] + '.png');
-  end;
+  for V := 0 to 19 do
+    if SpecialArt[V] <> '' then
+    begin
+      Pairs.push('special_' + SpecialArt[V]);
+      Pairs.push('assets/specials/special_' + SpecialArt[V] + '.png');
+    end;
   GlueLoadImages(Pairs, @Boot);
 end;
 

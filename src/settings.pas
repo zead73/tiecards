@@ -21,6 +21,7 @@ type
     FWrapUnlocked: Boolean;
     FStockUnlocked: Boolean;
     FBackKey, FClothKey, FMoonKey: string;
+    FEquipped: string;
   public
     { AFileName = '' means never load or save (used by tests). A missing or
       unreadable file gives the defaults. }
@@ -40,6 +41,10 @@ type
     property ClothKey: string read FClothKey write FClothKey;
     property MoonKey: string read FMoonKey write FMoonKey;
     procedure ResetStyle;             { back to the original look }
+    { The relics equipped, as their keys with commas ('pick,locket'). Always check each is
+      still owned and that they fit the slots: the game does, whenever it reads this. }
+    property Equipped: string read FEquipped write FEquipped;
+    procedure ResetRelics;
   end;
 
 { Per-user save location (works on Linux and Windows). }
@@ -61,6 +66,7 @@ begin
   FFile := AFileName;
   FMode := gmFreePlay;
   ResetStyle;
+  ResetRelics;
   if (FFile <> '') and StoreRead(FFile, Text) then
   begin
     Ini := TTextIni.Create;
@@ -74,6 +80,7 @@ begin
       FBackKey := Ini.ReadString('Settings', 'Back', FBackKey);
       FClothKey := Ini.ReadString('Settings', 'Cloth', FClothKey);
       FMoonKey := Ini.ReadString('Settings', 'Moon', FMoonKey);
+      FEquipped := Ini.ReadString('Settings', 'Relics', '');
     finally
       Ini.Free;
     end;
@@ -99,10 +106,16 @@ begin
     Ini.WriteString('Settings', 'Back', FBackKey);
     Ini.WriteString('Settings', 'Cloth', FClothKey);
     Ini.WriteString('Settings', 'Moon', FMoonKey);
+    Ini.WriteString('Settings', 'Relics', FEquipped);
     StoreWrite(FFile, Ini.ToText);
   finally
     Ini.Free;
   end;
+end;
+
+procedure TSettings.ResetRelics;
+begin
+  FEquipped := '';
 end;
 
 procedure TSettings.ResetStyle;

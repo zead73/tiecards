@@ -23,7 +23,7 @@ interface
 uses
   SysUtils, Types, Math, Cards, TriPeaks, Inventory, Session, Sound, Anim, Stage,
   NewGameAnim, Vampires, Story, Campaign, Duel, DuelSession, DuelInfo, Scenes,
-  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules, Trophies, Cosmetics;
+  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules, Trophies, Cosmetics, Relics;
 
 const
   { The table is laid out on a fixed design grid and scaled to fit. }
@@ -83,7 +83,7 @@ type
 
   { The Store (Fenwick's goods) and the tray of your own special cards are two
     overlays drawn over the table; both are a list of rows with a button. }
-  TOverlayKind = (okNone, okStore, okCards, okRecords, okSlots, okTrophies, okStyle);
+  TOverlayKind = (okNone, okStore, okCards, okRecords, okSlots, okTrophies, okStyle, okRelics);
 
   TOverlayRow = record
     Title, Detail: string;
@@ -107,7 +107,8 @@ const
   ArtTrophy0 = StoreGoodCount;
   ArtTrophyEmpty = StoreGoodCount + TrophyCount;
   StyleTabHeight = 34;                       { the tabs on the Style page }
-  OverlayArtCount = ArtTrophyEmpty;          { pictures to load: the goods and the trophies }
+  ArtRelic0 = ArtTrophyEmpty + 1;            { the relics' pictures follow (ArtTrophyEmpty itself has none) }
+  OverlayArtCount = ArtRelic0 + RelicCount;  { pictures to load: the goods, the trophies and the relics }
 
 type
   TChangeEvent = procedure of object;
@@ -163,6 +164,10 @@ type
     FOffX, FOffY: Integer;
     procedure Changed;
     procedure EarnTrophy(T: TTrophy);
+    function RelicOwned(R: TRelic): Boolean;
+    function RelicsEquippedMask: Integer;
+    function RelicRow(I: Integer): TOverlayRow;
+    procedure RelicAction(I: Integer);
     function StyleAvailable(K: TCosmeticKind; I: Integer): Boolean;
     function StyleChoice(K: TCosmeticKind): Integer;
     function StyleRow(I: Integer): TOverlayRow;
@@ -314,6 +319,10 @@ type
     procedure ActionOpenTrophies;
     { ---- Style: card backs, table cloths and the colour of the moon ---- }
     procedure ActionOpenStyle;
+    { ---- relics: small permanent helps from Fenwick, carried in a few slots ---- }
+    procedure ActionOpenRelics;
+    function RelicSlotCount: Integer;          { one, and one more for each vampire trophy }
+    function RelicEquipped(R: TRelic): Boolean;
     function StyleBack: Integer;               { the choice in use (0 = the original look) }
     function StyleCloth: Integer;
     function StyleMoon: Integer;
@@ -350,8 +359,9 @@ type
     function OverlayTabRect(I: Integer): TRect;
     function OverlayTabCaption(I: Integer): string;
     function OverlayTabSelected(I: Integer): Boolean;
-    function OverlayExtraCaption: string;             { '' = no button }
-    function OverlayExtraRect: TRect;
+    function OverlayExtraCount: Integer;              { buttons beside Close: the Store has Style and Relics }
+    function OverlayExtraCaption(I: Integer): string;
+    function OverlayExtraRect(I: Integer): TRect;
     function OverlayLeaveRect: TRect;
     function OverlayFooterRect: TRect;
     { Drawing the table: is this card shown face up (free, or Seer's eye)? is it
@@ -391,6 +401,7 @@ begin
   FRecords := TRecords.Create(DefaultRecordsFile);
   FTrophies := TTrophies.Create(DefaultTrophiesFile);
   if FTrophies.IsNew then FTrophies.SeedFrom(FRecords, FCampaign.Current);   { what the records already prove }
+  FSession.RelicProvider := @RelicsEquippedMask;                              { every deal asks what is equipped }
   FSession.OnWon := @SessionWon;
   FDuel.OnHandWon := @DuelWon;
   FHooks.OnToll := @HookToll;
@@ -1087,7 +1098,8 @@ begin
   Result.UndoCaption := Format('Undo (%d)', [Inv.UndoCards]);
   Result.UndoEnabled := FSession.CanUseUndo and HandIsLive;
   Result.HintCaption := Format('Show move (%d)', [Inv.HintCards]);
-  Result.HintEnabled := (Inv.HintCards > 0) and HandIsLive;
+  if FSession.FreeHintAvailable then Result.HintCaption := 'Show move (free)';      { the Moonstone }
+  Result.HintEnabled := ((Inv.HintCards > 0) or FSession.FreeHintAvailable) and HandIsLive;
   Result.MenuCaption := 'Menu';
   Result.StoreCaption := 'Store';
   Result.CardsCaption := Format('My cards (%d)', [Inv.TotalSpecialCards]);
@@ -1894,6 +1906,7 @@ begin
     okSlots: if FSlotsSave then Result := 4 else Result := 8;   { headings and three slots a mode }
     okTrophies: Result := TrophyCount;
     okStyle: Result := CosmeticsPerKind;
+    okRelics: Result := RelicCount;
   else
     Result := 0;
   end;
@@ -1932,6 +1945,11 @@ begin
   if FOverlay = okStyle then
   begin
     Result := StyleRow(I);
+    Exit;
+  end;
+  if FOverlay = okRelics then
+  begin
+    Result := RelicRow(I);
     Exit;
   end;
   if FOverlay = okTrophies then
@@ -2009,6 +2027,7 @@ begin
     okSlots: if FSlotsSave then Result := 'Save game' else Result := 'Load game';
     okTrophies: Result := 'Your trophies';
     okStyle: Result := 'Style';
+    okRelics: Result := 'Relics';
   else
     Result := '';
   end;
@@ -2022,6 +2041,9 @@ begin
       Result := 'Pick a card to use it. The Wild card and Wood Stake then ask you to tap a free card. Dimmed cards would do nothing now.';
     okRecords:
       Result := 'Your best results on this device. Only won hands count.';
+    okRelics:
+      Result := Format('Small things Fenwick sells to help against the vampires. Slots used: %d of %d. A relic works in the hands dealt while it is equipped, and in this hand too if you have not moved yet.',
+        [RelicsInMask(RelicsEquippedMask), RelicSlotCount]);
     okStyle:
       Result := 'How the cards, the table and the moon look. It never changes how a hand plays.';
     okTrophies:
@@ -2048,9 +2070,11 @@ end;
 
 function TGameController.OverlayFooter: string;
 begin
-  if FOverlay = okStore then
+  if (FOverlay = okStore) and (FVW < 520) and (OverlayExtraCount > 0) then
+    Result := ''                                 { no room: the coins are in the status line anyway }
+  else if FOverlay = okStore then
     Result := Format('Coins: %d', [FSession.Inventory.Coins])
-  else if FOverlay = okStyle then
+  else if (FOverlay = okStyle) or (FOverlay = okRelics) then
     Result := Format('Coins: %d', [FSession.Inventory.Coins])
   else if FOverlay = okTrophies then
     Result := Format('%d of %d earned', [FTrophies.Count, TrophyCount])
@@ -2119,6 +2143,7 @@ begin
     SpeechH := 72;
     if (FVH < 420) or (FVW < 520) then SpeechH := 90;
     if FOverlay in [okRecords, okSlots, okTrophies, okStyle] then SpeechH := 62;
+    if FOverlay = okRelics then SpeechH := 80;
     if (FOverlay = okStyle) and ((FVH < 420) or (FVW < 520)) then SpeechH := 90;
     L.Speech := Rect(L.X0, L.Panel.Top + Pad, L.X1, L.Panel.Top + Pad + SpeechH);
     L.RowsTop := L.Speech.Bottom + Pad;
@@ -2200,17 +2225,32 @@ begin
   Result := (FOverlay = okStyle) and (I = FStyleTab);
 end;
 
-function TGameController.OverlayExtraCaption: string;
+function TGameController.OverlayExtraCount: Integer;
 begin
-  if (FOverlay = okStore) and not IntroActive then Result := 'Style' else Result := '';
+  if (FOverlay = okStore) and not IntroActive then Result := 2 else Result := 0;
 end;
 
-function TGameController.OverlayExtraRect: TRect;
+function TGameController.OverlayExtraCaption(I: Integer): string;
+begin
+  case I of
+    0: Result := 'Relics';
+    1: Result := 'Style';
+  else
+    Result := '';
+  end;
+  if I >= OverlayExtraCount then Result := '';
+end;
+
+function TGameController.OverlayExtraRect(I: Integer): TRect;
 var
   L: TOverlayLayout;
+  BW: Integer;
 begin
   L := Layout;
-  Result := Rect(L.Leave.Left - 8 - 110, L.Leave.Top, L.Leave.Left - 8, L.Leave.Bottom);
+  BW := 110;
+  if FVW < 520 then BW := 80;                  { a phone held upright: three buttons have to fit the row }
+  { Relics sits beside Close, Style beside Relics }
+  Result := Rect(L.Leave.Left - (I + 1) * (BW + 8), L.Leave.Top, L.Leave.Left - (I + 1) * (BW + 8) + BW, L.Leave.Bottom);
 end;
 
 function TGameController.OverlayButton2Rect(I: Integer): TRect;
@@ -2283,6 +2323,11 @@ begin
     StyleAction(I);
     Exit;
   end;
+  if FOverlay = okRelics then
+  begin
+    RelicAction(I);
+    Exit;
+  end;
   if FOverlay = okStore then
   begin
     if not Stocked(I) then
@@ -2334,11 +2379,12 @@ begin
     ActionCloseOverlay;
     Exit;
   end;
-  if (OverlayExtraCaption <> '') and PtInRect(OverlayExtraRect, P) then
-  begin
-    ActionOpenStyle;                   { Fenwick's Style page }
-    Exit;
-  end;
+  for I := 0 to OverlayExtraCount - 1 do
+    if PtInRect(OverlayExtraRect(I), P) then
+    begin
+      if I = 0 then ActionOpenRelics else ActionOpenStyle;     { Fenwick's other pages }
+      Exit;
+    end;
   for I := 0 to OverlayTabCount - 1 do
     if PtInRect(OverlayTabRect(I), P) then
     begin
@@ -2587,6 +2633,179 @@ function TGameController.TrophyArt(I: Integer): Integer;
 begin
   if (I >= 0) and (I < TrophyCount) and FTrophies.Has(TTrophy(I)) then Result := ArtTrophy0 + I
   else Result := ArtTrophyEmpty;
+end;
+
+{ ---- relics ---- }
+
+{ Bought, or given by a trophy. }
+function TGameController.RelicOwned(R: TRelic): Boolean;
+var
+  T: Integer;
+begin
+  Result := FSession.Inventory.BoughtRelic(R);
+  T := RelicTrophy(R);
+  if (T <> NoRelicTrophy) and FTrophies.Has(TTrophy(T)) then Result := True;
+end;
+
+function TGameController.RelicSlotCount: Integer;
+var
+  V, N: Integer;
+begin
+  N := 0;
+  for V := 0 to VampireCount - 1 do
+    if FTrophies.Has(TrophyForVampire(V)) then Inc(N);
+  Result := RelicSlots(N);
+end;
+
+{ The relics in use, as bits: what the player chose, in order, if they still own it and
+  it fits the slots (a loaded save or an edited file may break either). }
+function TGameController.RelicsEquippedMask: Integer;
+var
+  S, Key: string;
+  P, Idx, N: Integer;
+begin
+  Result := 0;
+  N := 0;
+  S := FSettings.Equipped;
+  while S <> '' do
+  begin
+    P := Pos(',', S);
+    if P = 0 then
+    begin
+      Key := S;
+      S := '';
+    end
+    else
+    begin
+      Key := Copy(S, 1, P - 1);
+      S := Copy(S, P + 1, Length(S));
+    end;
+    Idx := RelicIndexOf(Key);
+    if (Idx >= 0) and RelicOwned(TRelic(Idx)) and not HasRelic(Result, TRelic(Idx)) and (N < RelicSlotCount) then
+    begin
+      Result := Result or RelicBit(TRelic(Idx));
+      Inc(N);
+    end;
+  end;
+end;
+
+function TGameController.RelicEquipped(R: TRelic): Boolean;
+begin
+  Result := HasRelic(RelicsEquippedMask, R);
+end;
+
+procedure TGameController.ActionOpenRelics;
+begin
+  if Animating and FInScene then Exit;
+  if Animating then SkipDeal;
+  if not FMenuOpen then CloseModes;
+  FOverlay := okRelics;
+  Changed;
+end;
+
+function TGameController.RelicRow(I: Integer): TOverlayRow;
+var
+  R: TRelic;
+  T: Integer;
+  Used: Integer;
+  B: Integer;
+begin
+  R := TRelic(I);
+  Result.Title := FStory.RelicName(RelicKey(R));
+  Result.Detail := FStory.RelicLine(RelicKey(R));
+  Result.Aside := '';
+  Result.ButtonText := '';
+  Result.ButtonEnabled := False;
+  Result.Button2Text := '';
+  Result.Button2Enabled := False;
+  Result.Art := ArtRelic0 + I;
+  Result.Selected := False;
+  Result.Header := False;
+  Result.Preview := 0;
+  T := RelicTrophy(R);
+  Used := 0;
+  for B := 0 to RelicCount - 1 do
+    if RelicEquipped(TRelic(B)) then Inc(Used);
+  if RelicEquipped(R) then
+  begin
+    Result.Selected := True;
+    Result.Aside := 'equipped';
+    Result.ButtonText := 'Remove';
+    Result.ButtonEnabled := True;
+  end
+  else if RelicOwned(R) then
+  begin
+    Result.ButtonText := 'Equip';
+    Result.ButtonEnabled := Used < RelicSlotCount;
+  end
+  else
+  begin
+    Result.Aside := Format('%d coins', [RelicPrice(R)]);
+    Result.ButtonText := 'Buy';
+    Result.ButtonEnabled := FSession.Inventory.CanBuyRelic(R);
+    if T <> NoRelicTrophy then
+      Result.Detail := Result.Detail + ' Also earned with ' + FStory.TrophyName(TrophyKeys[TTrophy(T)]) + '.';
+  end;
+end;
+
+{ Buy, equip or remove relic I. }
+procedure TGameController.RelicAction(I: Integer);
+var
+  R: TRelic;
+  Name, Key, S: string;
+  Used, B: Integer;
+begin
+  R := TRelic(I);
+  Name := FStory.RelicName(RelicKey(R));
+  Key := RelicKey(R);
+  Used := 0;
+  for B := 0 to RelicCount - 1 do
+    if RelicEquipped(TRelic(B)) then Inc(Used);
+  if RelicEquipped(R) then
+  begin
+    { take it out: rebuild the list without it }
+    S := '';
+    for B := 0 to RelicCount - 1 do
+      if (B <> I) and RelicEquipped(TRelic(B)) then
+      begin
+        if S <> '' then S := S + ',';
+        S := S + RelicKey(TRelic(B));
+      end;
+    FSettings.Equipped := S;
+    FToast := Name + ' removed.';
+  end
+  else
+  begin
+    if not RelicOwned(R) then
+    begin
+      if not FSession.Inventory.BuyRelic(R) then Exit;
+      FSession.SaveNow;
+      FToast := 'Bought ' + Name + '.';
+    end
+    else
+      FToast := '';
+    if Used < RelicSlotCount then
+    begin
+      S := FSettings.Equipped;
+      { keep only what is really in use, then add this one }
+      S := '';
+      for B := 0 to RelicCount - 1 do
+        if RelicEquipped(TRelic(B)) then
+        begin
+          if S <> '' then S := S + ',';
+          S := S + RelicKey(TRelic(B));
+        end;
+      if S <> '' then S := S + ',';
+      FSettings.Equipped := S + Key;
+      FToast := FToast + ' ' + Name + ' equipped.';
+    end
+    else
+      FToast := FToast + ' No free slot: remove a relic first.';
+    FToast := Trim(FToast);
+  end;
+  FSettings.Save;
+  FSession.Relics := RelicsEquippedMask;      { a hand not yet started takes the change at once }
+  Changed;
 end;
 
 { ---- Style ---- }

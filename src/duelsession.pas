@@ -185,7 +185,7 @@ begin
   if FDuel.State <> dsPlaying then Exit;
   if FSession.Game.IsWon then
   begin
-    if FDuel.HandWon(FSession.Misses, FSession.Bites) then
+    if FDuel.HandWon(FSession.ChargedMisses, FSession.ChargedBites) then
     begin
       Pay(FDuel.LastReward);
       if Assigned(FOnHandWon) then
@@ -228,7 +228,7 @@ end;
 
 function TDuelSession.PayoutNow: Integer;
 begin
-  Result := RewardAfterCuts(FDuel.Spoils, FSession.Misses, FSession.Bites) + FDuel.KillBonus;
+  Result := RewardAfterCuts(FDuel.Spoils, FSession.ChargedMisses, FSession.ChargedBites) + FDuel.KillBonus;
   if FCampaign.IsComplete then Result := 0;
 end;
 

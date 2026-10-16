@@ -10,7 +10,7 @@ unit Inventory;
 interface
 
 uses
-  SysUtils, TextIni, Storage, Specials, Cosmetics;
+  SysUtils, TextIni, Storage, Specials, Cosmetics, Relics;
 
 const
   StartingCoins = 50;
@@ -34,6 +34,7 @@ type
     FHintCards: Integer;
     FSpecials: array[TSpecialKind] of Integer;
     FBought: array[TCosmeticKind, 0..CosmeticsPerKind - 1] of Boolean;   { Style items bought with coins }
+    FBoughtRelic: array[TRelic] of Boolean;
     FPaidHands: array of Integer;       { ids of hands whose reward was paid }
     FPricePercent: Integer;
     procedure ParseIds(const S: string);
@@ -56,6 +57,10 @@ type
     function BoughtCosmetic(K: TCosmeticKind; I: Integer): Boolean;
     function CanBuyCosmetic(K: TCosmeticKind; I: Integer): Boolean;
     function BuyCosmetic(K: TCosmeticKind; I: Integer): Boolean;   { False if it cannot be bought }
+    { Relics bought from Fenwick (the caller also counts the ones a trophy gives). }
+    function BoughtRelic(R: TRelic): Boolean;
+    function CanBuyRelic(R: TRelic): Boolean;
+    function BuyRelic(R: TRelic): Boolean;
     function SpendCoins(N: Integer): Boolean;                      { False, taking nothing, if too few }
     procedure AddUndoCards(N: Integer);
     function CanBuyUndoPack: Boolean;
@@ -138,6 +143,7 @@ var
   K: TSpecialKind;
   CK: TCosmeticKind;
   CI: Integer;
+  RR: TRelic;
 begin
   FCoins := StartingCoins;
   FUndoCards := 0;
@@ -146,6 +152,25 @@ begin
   FPaidHands := nil;
   for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
     for CI := 0 to CosmeticsPerKind - 1 do FBought[CK, CI] := False;
+  for RR := Low(TRelic) to High(TRelic) do FBoughtRelic[RR] := False;
+end;
+
+function TPlayerInventory.BoughtRelic(R: TRelic): Boolean;
+begin
+  Result := FBoughtRelic[R];
+end;
+
+function TPlayerInventory.CanBuyRelic(R: TRelic): Boolean;
+begin
+  Result := not FBoughtRelic[R] and (FCoins >= RelicPrice(R));
+end;
+
+function TPlayerInventory.BuyRelic(R: TRelic): Boolean;
+begin
+  Result := CanBuyRelic(R);
+  if not Result then Exit;
+  Dec(FCoins, RelicPrice(R));
+  FBoughtRelic[R] := True;
 end;
 
 function TPlayerInventory.BoughtCosmetic(K: TCosmeticKind; I: Integer): Boolean;
@@ -329,6 +354,7 @@ var
   K: TSpecialKind;
   CK: TCosmeticKind;
   CI: Integer;
+  RR: TRelic;
 begin
   Reset;
   Ini := TTextIni.Create;
@@ -350,6 +376,8 @@ begin
       for CI := 1 to CosmeticsPerKind - 1 do
         FBought[CK, CI] := Ini.ReadBool('Inventory', 'Style.' + CosmeticStoryKey(CK, CI), False)
           and (CosmeticTrophy(CK, CI) = NoTrophy);
+    for RR := Low(TRelic) to High(TRelic) do
+      FBoughtRelic[RR] := Ini.ReadBool('Inventory', 'Relic.' + RelicKey(RR), False);
   finally
     Ini.Free;
   end;
@@ -361,6 +389,7 @@ var
   K: TSpecialKind;
   CK: TCosmeticKind;
   CI: Integer;
+  RR: TRelic;
 begin
   Ini := TTextIni.Create;
   try
@@ -373,6 +402,8 @@ begin
     for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
       for CI := 1 to CosmeticsPerKind - 1 do
         Ini.WriteBool('Inventory', 'Style.' + CosmeticStoryKey(CK, CI), FBought[CK, CI]);
+    for RR := Low(TRelic) to High(TRelic) do
+      Ini.WriteBool('Inventory', 'Relic.' + RelicKey(RR), FBoughtRelic[RR]);
     Result := Ini.ToText;
   finally
     Ini.Free;
@@ -386,6 +417,7 @@ var
   K: TSpecialKind;
   CK: TCosmeticKind;
   CI: Integer;
+  RR: TRelic;
 begin
   Ini := TTextIni.Create;
   try
@@ -399,6 +431,8 @@ begin
     for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
       for CI := 1 to CosmeticsPerKind - 1 do
         Ini.WriteBool('Inventory', 'Style.' + CosmeticStoryKey(CK, CI), FBought[CK, CI]);
+    for RR := Low(TRelic) to High(TRelic) do
+      Ini.WriteBool('Inventory', 'Relic.' + RelicKey(RR), FBoughtRelic[RR]);
     StoreWrite(FileName, Ini.ToText);
   finally
     Ini.Free;

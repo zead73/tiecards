@@ -95,10 +95,10 @@ begin
   { the cuts as they really apply (the floor can stop them short) }
   Result.LostHandsCut := Result.PerWin - ADuel.Duel.Spoils;
   Result.Misses := ADuel.Session.Misses;
-  Result.MissCut := ADuel.Duel.Spoils - RewardAfterMisses(ADuel.Duel.Spoils, Result.Misses);
+  Result.MissCut := ADuel.Duel.Spoils - RewardAfterMisses(ADuel.Duel.Spoils, ADuel.Session.ChargedMisses);
   Result.Bites := ADuel.Session.Bites;
-  Result.BiteCut := RewardAfterMisses(ADuel.Duel.Spoils, Result.Misses)
-    - RewardAfterCuts(ADuel.Duel.Spoils, Result.Misses, Result.Bites);
+  Result.BiteCut := RewardAfterMisses(ADuel.Duel.Spoils, ADuel.Session.ChargedMisses)
+    - RewardAfterCuts(ADuel.Duel.Spoils, ADuel.Session.ChargedMisses, ADuel.Session.ChargedBites);
   Result.Eased := ADuel.Campaign.EaseLive;
   if not Result.Eased then                 { the silver cross switches his trick off }
     case VampireHazard[V] of
@@ -109,8 +109,8 @@ begin
   Result.PayNow := ADuel.PayoutNow;
   { the floor is holding the per-win pay up if the plain sums would go lower }
   Result.AtFloor := Result.PayNow - Result.KillBonus
-    > Result.PerWin - SpoilsStep * Result.LostHands - MissPenaltyCoins * Result.Misses
-      - BitePenaltyCoins * Result.Bites;
+    > Result.PerWin - SpoilsStep * Result.LostHands - MissPenaltyCoins * ADuel.Session.ChargedMisses
+      - BitePenaltyCoins * ADuel.Session.ChargedBites;
   Result.StuckWaiting := ADuel.StuckWaiting;
   if Result.Eased then
   begin

@@ -48,6 +48,7 @@ type
     Missed: Boolean;                    { a draw made while a card could have been played }
     Bitten: Boolean;                    { a play of a bitten card }
     Ate: Boolean;                       { a draw after which the vampire ate a stock card }
+    Broke: Boolean;                     { a play of a chained card that the Locksmith's Pick let through }
     PrevWasteTop: TCard;
     PrevStreak: Integer;
   end;
@@ -70,6 +71,8 @@ type
     History: TUndoArray;                { the moves since the deal or the last special card }
     Hazard: Integer;                    { Ord(THazard) }
     Marks: TMarkArray;
+    FeedSkip: Boolean;                  { the Iron Spoon: his first feeding is skipped }
+    BreakStart, BreakLeft: Integer;     { the Locksmith's Pick: breaks the hand began with (0 or 1), and still unused }
   end;
 
   TTriPeaksGame = class
@@ -95,6 +98,8 @@ type
     FSpare: TCardArray;
     FRevealed: Boolean;
     FStakes: Integer;
+    FFeedSkip: Boolean;
+    FBreakStart, FBreakLeft: Integer;
     procedure RecordMove(ADraw: Boolean; AIndex: Integer; AMissed: Boolean; ABitten: Boolean = False);
     procedure ForgetUndo;
     procedure EatCard;
@@ -143,7 +148,15 @@ type
     function PlaceCross: Integer;
     function HasMark(Kind: Integer): Boolean;     { a card of this mark is still on the table }
     function Mark(I: Integer): Integer;
-    function IsLocked(I: Integer): Boolean;       { chained, with a neighbour still on the table }
+    function IsLocked(I: Integer): Boolean;       { chained, with a neighbour still on the table, and no break left to spend }
+    function IsLockedStrict(I: Integer): Boolean; { chained, with a neighbour still on the table (the plain rule) }
+    { Relics that change the rules of the hand just dealt (call before the first
+      move): the Iron Spoon skips his first feeding, and the Locksmith's Pick gives
+      ABreaks (0 or 1) chained cards that may be played anyway. }
+    procedure SetRelicRules(AFeedSkip: Boolean; ABreaks: Integer);
+    property FeedSkipped: Boolean read FFeedSkip;
+    property BreaksLeft: Integer read FBreakLeft;
+    property BreaksAtStart: Integer read FBreakStart;
     property Hazard: THazard read FHazard;
     { Capture the hand, and put one back. SetState checks the data against the
       game's own bookkeeping (card counts, which cards may be removed, ...) and
@@ -289,6 +302,9 @@ begin
   FRevealed := False;
   SetLength(FHistory, 0);                   { nothing of the last hand's undo lingers }
   FHazard := hzNone;
+  FFeedSkip := False;
+  FBreakStart := 0;
+  FBreakLeft := 0;
   for I := 0 to TableauSize - 1 do FMarks[I] := MarkNone;
   FHandId := 1 + Random(MaxInt - 1);
 end;
@@ -304,6 +320,7 @@ begin
     Missed := AMissed;
     Bitten := ABitten;
     Ate := False;
+    Broke := False;
     PrevWasteTop := FWasteTop;
     PrevStreak := FStreak;
   end;
@@ -381,6 +398,7 @@ begin
   begin
     FRemoved[M.Index] := False;
     Dec(FPlays);
+    if M.Broke then FBreakLeft := 1;           { the Pick's break is given back }
   end;
   FWasteTop := M.PrevWasteTop;
   Dec(FWasteCount);
@@ -428,7 +446,21 @@ begin
     if (FMarks[I] = Kind) and not FRemoved[I] then Exit(True);
 end;
 
+procedure TTriPeaksGame.SetRelicRules(AFeedSkip: Boolean; ABreaks: Integer);
+begin
+  FFeedSkip := AFeedSkip;
+  if ABreaks < 0 then ABreaks := 0;
+  if ABreaks > 1 then ABreaks := 1;
+  FBreakStart := ABreaks;
+  FBreakLeft := ABreaks;
+end;
+
 function TTriPeaksGame.IsLocked(I: Integer): Boolean;
+begin
+  Result := (FBreakLeft = 0) and IsLockedStrict(I);
+end;
+
+function TTriPeaksGame.IsLockedStrict(I: Integer): Boolean;
 var
   Q: Integer;
 begin
@@ -504,6 +536,11 @@ begin
   Result := CanPlay(I);
   if not Result then Exit;
   RecordMove(False, I, False, FMarks[I] = MarkBitten);
+  if IsLockedStrict(I) then                   { a chained card let through by the Pick: the one break is used }
+  begin
+    FHistory[High(FHistory)].Broke := True;
+    FBreakLeft := 0;
+  end;
   FRemoved[I] := True;
   FWasteTop := FTableau[I];
   Inc(FWasteCount);
@@ -528,7 +565,8 @@ begin
   FStreak := 0;
   { hunger: after every FeedEvery-th draw he eats the bottom card of the stock }
   if (FHazard = hzHunger) and (Length(FStock) > 0)
-    and ((FWasteCount - 1 - FPlays) mod FeedEvery = 0) then
+    and ((FWasteCount - 1 - FPlays) mod FeedEvery = 0)
+    and not (FFeedSkip and (FWasteCount - 1 - FPlays = FeedEvery)) then       { the Spoon: not the first time }
   begin
     EatCard;
     FHistory[High(FHistory)].Ate := True;
@@ -717,12 +755,16 @@ begin
   D.History := Copy(FHistory);
   D.Hazard := Ord(FHazard);
   for I := 0 to TableauSize - 1 do D.Marks[I] := FMarks[I];
+  D.FeedSkip := FFeedSkip;
+  D.BreakStart := FBreakStart;
+  D.BreakLeft := FBreakLeft;
 end;
 
 function TTriPeaksGame.ValidState(const D: THandData): Boolean;
 var
   StockStart: Integer;                         { cards in the stock after the deal }
-  I, K, Q, RemovedCount, VStock, VPlays, VWaste, VStreak, VStart, VSpare, Marked, Crosses: Integer;
+  I, K, Q, RemovedCount, VStock, VPlays, VWaste, VStreak, VStart, VSpare, Marked, Crosses, BreaksSeen: Integer;
+  Broken: Boolean;
   VRemoved: TRemovedArray;
   VTop: TCard;
   M: TUndoMove;
@@ -751,6 +793,8 @@ begin
     special cards has none, which is fine: a Full deck then has nothing to add) }
   if Length(D.Spare) > FullStock - StockStart then Exit;
   if D.Stakes < 0 then Exit;
+  { the relic rules: the Pick gives at most one break, and the Spoon needs his hunger to matter (but is harmless without) }
+  if (D.BreakStart < 0) or (D.BreakStart > 1) or (D.BreakLeft < 0) or (D.BreakLeft > D.BreakStart) then Exit;
   { a vampire's marks: only the kind his trick uses, in the places it can be }
   if (D.Hazard < Ord(Low(THazard))) or (D.Hazard > Ord(High(THazard))) then Exit;
   Marked := 0;
@@ -816,6 +860,7 @@ begin
   VWaste := D.WasteCount;
   VTop := D.WasteTop;
   VStreak := D.Streak;
+  BreaksSeen := 0;
   for K := High(D.History) downto 0 do
   begin
     M := D.History[K];
@@ -826,6 +871,7 @@ begin
       if VStreak <> 0 then Exit;                      { a draw ends the streak }
       for I := 0 to TableauSize - 1 do                { a drawn card never came from the table }
         if (D.Tableau[I].Suit = VTop.Suit) and (D.Tableau[I].Rank = VTop.Rank) then Exit;
+      if M.Broke then Exit;                           { a draw is never a break }
       Inc(VStock);
       if M.Ate then                                   { the card he ate comes back first }
       begin
@@ -850,6 +896,16 @@ begin
       else if VStreak <> M.PrevStreak + 1 then Exit;
       for Q := 0 to 1 do                              { it was free when it was played }
         if (FCover[M.Index, Q] >= 0) and not VRemoved[FCover[M.Index, Q]] then Exit;
+      if M.Broke then                                 { a break: a chained card, with a neighbour still on the table, and the Pick }
+      begin
+        if (D.Marks[M.Index] <> MarkChained) or (D.BreakStart <> 1) or (D.BreakLeft <> 0) then Exit;
+        Broken := False;
+        for Q := 0 to 1 do
+          if (FNeighbor[M.Index, Q] >= 0) and not VRemoved[FNeighbor[M.Index, Q]] then Broken := True;
+        if not Broken then Exit;
+        Inc(BreaksSeen);
+        if BreaksSeen > 1 then Exit;
+      end;
       VRemoved[M.Index] := False;
       if not RemovedOk(VRemoved) then Exit;
       Dec(VPlays);
@@ -888,6 +944,9 @@ begin
   FHistory := Copy(D.History);
   FHazard := THazard(D.Hazard);
   for I := 0 to TableauSize - 1 do FMarks[I] := D.Marks[I];
+  FFeedSkip := D.FeedSkip;
+  FBreakStart := D.BreakStart;
+  FBreakLeft := D.BreakLeft;
 end;
 
 end.

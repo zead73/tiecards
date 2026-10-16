@@ -12,6 +12,8 @@ var
   StockN: Integer;
   Wrap: Boolean;
   FeedEvery: Integer;                  { 0 = no hunger }
+  SkipFeed: Integer;                   { Iron Spoon: how many of his first feedings are skipped (the relic skips 1) }
+  BreakOn: Boolean;                    { Locksmith's Pick: one chained card per hand may be played anyway }
   Seen: specialize TDictionary<QWord, Boolean>;
   Nodes, NodeCap: Int64;
   Capped: Boolean;
@@ -49,22 +51,39 @@ begin
     and ((Cover[I,1] < 0) or ((Mask shr Cover[I,1]) and 1 = 1));
 end;
 
-function Playable(Mask: LongWord; I: Integer): Boolean;
+{ Locked as the chain rule says (a neighbour in its row is still on the table). }
+function Locked(Mask: LongWord; I: Integer): Boolean;
 var Q: Integer;
 begin
-  Result := Free(Mask, I);
-  if Result and Chained[I] then
+  Result := False;
+  if Chained[I] then
     for Q := 0 to 1 do
-      if (Nb[I,Q] >= 0) and ((Mask shr Nb[I,Q]) and 1 = 0) then Result := False;
+      if (Nb[I,Q] >= 0) and ((Mask shr Nb[I,Q]) and 1 = 0) then Result := True;
+end;
+
+{ BreakLeft = 1 while the Pick's one break is still unused. }
+function Playable(Mask: LongWord; I, BreakLeft: Integer): Boolean;
+begin
+  Result := Free(Mask, I) and (not Locked(Mask, I) or (BreakLeft > 0));
 end;
 
 function Avail(Drawn: Integer): Integer;       { stock cards left before draw number Drawn+1 }
+var Fed: Integer;
 begin
-  if FeedEvery > 0 then Result := StockN - Drawn - (Drawn div FeedEvery)
+  if FeedEvery > 0 then
+  begin
+    Result := StockN - Drawn - (Drawn div FeedEvery);
+    if SkipFeed > 0 then
+    begin
+      Fed := Drawn div FeedEvery;                               { feedings that would have happened }
+      if Fed > SkipFeed then Fed := SkipFeed;
+      Inc(Result, Fed);                                         { the first ones never happened }
+    end;
+  end
   else Result := StockN - Drawn;
 end;
 
-function Solve(Mask: LongWord; Drawn, WasteRank: Integer): Boolean;
+function Solve(Mask: LongWord; Drawn, WasteRank, BreakLeft: Integer): Boolean;
 var
   I: Integer;
   Key: QWord;
@@ -73,16 +92,20 @@ begin
   if Mask = $0FFFFFFF then Exit(True);
   Inc(Nodes);
   if Nodes > NodeCap then begin Capped := True; Exit; end;
-  Key := (QWord(Mask) shl 12) or (QWord(Drawn) shl 5) or QWord(WasteRank);
+  Key := (QWord(Mask) shl 13) or (QWord(BreakLeft) shl 12) or (QWord(Drawn) shl 5) or QWord(WasteRank);
   if Seen.ContainsKey(Key) then Exit;
   for I := 27 downto 0 do
-    if Playable(Mask, I) and Adj(Rank[I], WasteRank) then
+    if Playable(Mask, I, BreakLeft) and Adj(Rank[I], WasteRank) then
     begin
-      if Solve(Mask or (LongWord(1) shl I), Drawn, Rank[I]) then Exit(True);
+      if Locked(Mask, I) then
+      begin
+        if Solve(Mask or (LongWord(1) shl I), Drawn, Rank[I], 0) then Exit(True);   { the break is used }
+      end
+      else if Solve(Mask or (LongWord(1) shl I), Drawn, Rank[I], BreakLeft) then Exit(True);
       if Capped then Exit;
     end;
   if Avail(Drawn) > 0 then
-    if Solve(Mask, Drawn + 1, Stock[Drawn]) then Exit(True);
+    if Solve(Mask, Drawn + 1, Stock[Drawn], BreakLeft) then Exit(True);
   if not Capped then Seen.Add(Key, True);
 end;
 
@@ -90,14 +113,15 @@ end;
 function Greedy(Waste: Integer): Boolean;
 var
   Mask: LongWord;
-  Drawn, I, Best, BestS, S, J, Q, O: Integer;
+  Drawn, I, Best, BestS, S, J, Q, O, BreakLeft: Integer;
 begin
-  Mask := 0; Drawn := 0;
+  Mask := 0; Drawn := 0; BreakLeft := 0;
+  if BreakOn then BreakLeft := 1;
   while Mask <> $0FFFFFFF do
   begin
     Best := -1; BestS := -1;
     for I := 27 downto 0 do
-      if Playable(Mask, I) and Adj(Rank[I], Waste) then
+      if Playable(Mask, I, 0) and Adj(Rank[I], Waste) then
       begin
         S := 0;
         for J := 0 to 27 do
@@ -111,6 +135,14 @@ begin
         if S > BestS then begin BestS := S; Best := I; end;
       end;
     if Best >= 0 then begin Mask := Mask or (LongWord(1) shl Best); Waste := Rank[Best]; end
+    else if BreakLeft > 0 then
+    begin                                   { nothing plays: use the Pick on a chained card that does }
+      for I := 27 downto 0 do
+        if (Best < 0) and Playable(Mask, I, 1) and Adj(Rank[I], Waste) then Best := I;
+      if Best >= 0 then begin Mask := Mask or (LongWord(1) shl Best); Waste := Rank[Best]; BreakLeft := 0; end
+      else if Avail(Drawn) > 0 then begin Waste := Stock[Drawn]; Inc(Drawn); end
+      else Exit(False);
+    end
     else if Avail(Drawn) > 0 then begin Waste := Stock[Drawn]; Inc(Drawn); end
     else Exit(False);
   end;
@@ -143,10 +175,10 @@ begin
   end;
 end;
 
-procedure Run(const Name: string; AWrap: Boolean; AStock, Chains, Feed, N: Integer);
+procedure Run(const Name: string; AWrap: Boolean; AStock, Chains, Feed, N: Integer; ASkip: Integer = 0; APick: Boolean = False);
 var K, WinP, WinG, Waste, Unknown: Integer;
 begin
-  Wrap := AWrap; StockN := AStock; FeedEvery := Feed;
+  Wrap := AWrap; StockN := AStock; FeedEvery := Feed; SkipFeed := ASkip; BreakOn := APick;
   WinP := 0; WinG := 0; Unknown := 0;
   RandSeed := 4242;
   for K := 1 to N do
@@ -154,7 +186,7 @@ begin
     RandomDeal(Waste);
     PickChains(Chains);
     Nodes := 0; Capped := False; Seen.Clear;
-    if Solve(0, 0, Waste) then Inc(WinP) else if Capped then Inc(Unknown);
+    if Solve(0, 0, Waste, Ord(BreakOn)) then Inc(WinP) else if Capped then Inc(Unknown);
     if Greedy(Waste) then Inc(WinG);
   end;
   WriteLn(Format('%-34s perfect %5.1f%%  plain %5.1f%%  (capped %d)', [Name, 100*WinP/N, 100*WinG/N, Unknown]));
@@ -167,4 +199,8 @@ begin
   Run('Lucien: the ordinary rules', True, 23, 0, 0, 500);
   Run('Carmilla: wrap, 20 stock, 3 chains', True, 20, 3, 0, 500);
   Run('Alaric: no wrap, 23 stock, feeds every 4', False, 23, 0, 4, 500);
+  Run('Carmilla with the Locksmith''s Pick', True, 20, 3, 0, 500, 0, True);
+  Run('Alaric with the Iron Spoon (skips 1 feeding)', False, 23, 0, 4, 500, 1, False);
+  Run('  ... if it skipped the first 2', False, 23, 0, 4, 500, 2, False);
+  Run('  ... if he fed every 6th draw instead', False, 23, 0, 6, 500, 0, False);
 end.

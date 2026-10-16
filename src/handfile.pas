@@ -154,6 +154,8 @@ begin
     end
     else if A[I].Bitten then
       T := 'B' + IntToStr(A[I].Index)                      { a bitten card }
+    else if A[I].Broke then
+      T := 'K' + IntToStr(A[I].Index)                      { a chained card the Pick let through }
     else
       T := 'P' + IntToStr(A[I].Index);
     if Result <> '' then Result := Result + ' ';
@@ -185,11 +187,13 @@ begin
       M.Missed := (Kind = 'M') or (Kind = 'X');
       M.Ate := (Kind = 'F') or (Kind = 'X');
       M.Bitten := False;
+      M.Broke := False;
       M.Index := 0;
       if not M.Draw then
       begin
-        if (Kind[1] <> 'P') and (Kind[1] <> 'B') then Exit;
+        if (Kind[1] <> 'P') and (Kind[1] <> 'B') and (Kind[1] <> 'K') then Exit;
         M.Bitten := Kind[1] = 'B';
+        M.Broke := Kind[1] = 'K';
         if not TryStrToInt(Copy(Kind, 2, MaxInt), M.Index) then Exit;
       end;
       if not StrToCard(Copy(Part, C1 + 1, C2 - C1 - 1), M.PrevWasteTop) then Exit;
@@ -256,6 +260,10 @@ begin
     L.Add('bites=' + IntToStr(H.Bites));
     L.Add('hazard=' + IntToStr(H.Game.Hazard));
     L.Add('marks=' + MarksToStr(H.Game.Marks));
+    L.Add('relics=' + IntToStr(H.Relics));
+    if H.FreeHintUsed then L.Add('freehint=1') else L.Add('freehint=0');
+    if H.Game.FeedSkip then L.Add('feedskip=1') else L.Add('feedskip=0');
+    L.Add(Format('breaks=%d %d', [H.Game.BreakStart, H.Game.BreakLeft]));
     L.Add('undo=' + MovesToStr(H.Game.History));
     Result := L.Text;
   finally
@@ -363,6 +371,33 @@ begin
       if not TryStrToInt(L.Values['hazard'], H.Game.Hazard) then Exit;
     if L.IndexOfName('marks') >= 0 then
       if not StrToMarks(L.Values['marks'], H.Game.Marks) then Exit;
+    { relics: a save from before them has none of these lines }
+    H.Relics := 0;
+    H.FreeHintUsed := False;
+    H.Game.FeedSkip := False;
+    H.Game.BreakStart := 0;
+    H.Game.BreakLeft := 0;
+    if L.IndexOfName('relics') >= 0 then
+      if not TryStrToInt(L.Values['relics'], H.Relics) or (H.Relics < 0) then Exit;
+    if L.IndexOfName('freehint') >= 0 then
+    begin
+      S := L.Values['freehint'];
+      if (S <> '0') and (S <> '1') then Exit;
+      H.FreeHintUsed := S = '1';
+    end;
+    if L.IndexOfName('feedskip') >= 0 then
+    begin
+      S := L.Values['feedskip'];
+      if (S <> '0') and (S <> '1') then Exit;
+      H.Game.FeedSkip := S = '1';
+    end;
+    if L.IndexOfName('breaks') >= 0 then
+      if not ParseInts(L.Values['breaks'], 2, Nums) then Exit
+      else
+      begin
+        H.Game.BreakStart := Nums[0];
+        H.Game.BreakLeft := Nums[1];
+      end;
     { the moves undo can take back. A save from the one-move days says just
       "undo=0" or "undo=1" (and the old snapshot lines): it loads with nothing
       to undo. }

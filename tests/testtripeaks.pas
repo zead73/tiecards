@@ -559,6 +559,197 @@ begin
   end;
 end;
 
+{ ---- the relics' rules: the Locksmith's Pick and the Iron Spoon ---- }
+
+procedure TestPick;
+var
+  G: TTriPeaksGame;
+  D: TDeck;
+  I, N, K, Chained, Used: Integer;
+  A, B, Start: THandData;
+  Ranks: array[0..27] of Integer;
+begin
+  G := TTriPeaksGame.Create;
+  try
+    { a hand where bottom-row card 25 is chained and its neighbour 24 is still there }
+    for I := 0 to 27 do Ranks[I] := 12;
+    Ranks[25] := 6;
+    Ranks[24] := 7;
+    G.Deal(BuildDeck(Ranks, 3, 7));
+    G.SetHazard(hzChained);
+    ClearMarks(G);
+    G.SetMark(25, MarkChained);
+    Check(G.IsLocked(25) and not G.CanPlay(25), 'no Pick: the chained card is locked while its neighbour is there');
+    G.SetRelicRules(False, 1);
+    Check(G.BreaksLeft = 1, 'the Pick gives one break');
+    Check(G.IsLockedStrict(25) and not G.IsLocked(25), 'with the Pick the card is let through (the plain rule still says locked)');
+    Check(G.CanPlay(25), 'and it can be played');
+    Check(G.HasMoves, 'a break counts as a move (a hand is not stuck while one could save it)');
+    G.GetState(Start);
+    Check(G.PlayTableau(25), 'play it');
+    Check(G.BreaksLeft = 0, 'the break is spent');
+    G.GetState(A);
+    Check(A.History[High(A.History)].Broke, 'the move remembers it broke a chain');
+    G.SetMark(23, MarkChained);                       { another chained card, its neighbours still there }
+    Check(G.IsLocked(23), 'a second chained card is locked: one break a hand');
+    Check(G.Undo, 'undo the play');
+    Check(G.BreaksLeft = 1, 'and the break is given back');
+    G.SetMark(23, MarkNone);                          { the test's own extra chain comes off }
+    G.GetState(B);
+    Check((B.Plays = 0) and (B.WasteCount = 1) and not B.Removed[25] and (B.BreakLeft = 1) and (Length(B.History) = 0),
+      'back at the start: the card is back, the break unspent, nothing to undo');
+  finally
+    G.Free;
+  end;
+end;
+
+procedure TestRelicStates;
+var
+  G, G2: TTriPeaksGame;
+  D: TDeck;
+  A, B, Start: THandData;
+  Kind: THazard;
+  N, Steps, I, Rejected, Moves, Breaks, Skips: Integer;
+  Acted: Boolean;
+begin
+  Rejected := 0;
+  Moves := 0;
+  Breaks := 0;
+  Skips := 0;
+  G := TTriPeaksGame.Create;
+  G2 := TTriPeaksGame.Create;
+  try
+    for Kind := hzChained to hzHunger do
+      for N := 1 to 200 do
+      begin
+        D := TDeck.Create;
+        D.Shuffle;
+        G.Deal(D, FullStock - Random(4));
+        D.Free;
+        G.SetHazard(Kind);
+        G.SetRelicRules(Random(2) = 0, Random(2));
+        G.GetState(Start);
+        for Steps := 1 to 90 do
+        begin
+          if G.IsWon or G.IsStuck then Break;
+          Acted := False;
+          if (Random(6) = 0) and G.CanUndo then
+          begin
+            G.Undo;
+            Acted := True;
+          end
+          else
+          begin
+            for I := TableauSize - 1 downto 0 do
+              if (Random(3) > 0) and G.PlayTableau(I) then
+              begin
+                Acted := True;
+                Break;
+              end;
+            if not Acted then Acted := G.DrawStock;
+          end;
+          if not Acted or G.IsWon then Break;
+          G.GetState(A);
+          Inc(Moves);
+          if (A.BreakStart = 1) and (A.BreakLeft = 0) then Inc(Breaks);
+          if A.FeedSkip and (A.WasteCount - 1 - A.Plays > FeedEvery) then Inc(Skips);
+          if not G2.SetState(A) then
+          begin
+            Inc(Rejected);
+            Continue;
+          end;
+          G2.GetState(B);
+          Check(StatesEqual(A, B), 'a hand with relic rules reloads exactly');
+        end;
+        { undo all the way: back to the deal, break and all }
+        while G.CanUndo do G.Undo;
+        if not G.IsWon then
+        begin
+          G.GetState(B);
+          Check((B.BreakLeft = B.BreakStart) and (B.BreakStart = Start.BreakStart), 'undone to the start: the break is back');
+          Check(B.WasteCount = 1, 'and the deal is as it was');
+        end;
+      end;
+  finally
+    G.Free;
+    G2.Free;
+  end;
+  Check(Rejected = 0, 'every real hand with relic rules was accepted (' + IntToStr(Rejected) + ' of ' + IntToStr(Moves) + ' refused)');
+  Check(Breaks > 50, 'enough hands used the Pick (' + IntToStr(Breaks) + ')');
+  Check(Skips > 50, 'enough hands went past the Spoon''s skipped feeding (' + IntToStr(Skips) + ')');
+end;
+
+procedure TestSpoon;
+var
+  G: TTriPeaksGame;
+  Ranks: array[0..27] of Integer;
+  I, N: Integer;
+begin
+  for I := 0 to 27 do Ranks[I] := 12;
+  G := TTriPeaksGame.Create;
+  try
+    { without the Spoon he feeds after the 4th draw }
+    G.Deal(BuildDeck(Ranks, 3, 7));
+    G.SetHazard(hzHunger);
+    for N := 1 to 3 do G.DrawStock;
+    Check(not G.LastMoveAte, 'three draws: nothing eaten');
+    G.DrawStock;
+    Check(G.LastMoveAte, 'the 4th draw: he feeds');
+    { with it, the first feeding is skipped; the next is the 8th draw }
+    G.Deal(BuildDeck(Ranks, 3, 7));
+    G.SetHazard(hzHunger);
+    G.SetRelicRules(True, 0);
+    for N := 1 to 4 do G.DrawStock;
+    Check(not G.LastMoveAte and (G.StockCount = 23 - 4), 'with the Spoon the 4th draw eats nothing');
+    for N := 5 to 7 do G.DrawStock;
+    Check(not G.LastMoveAte, 'nor the 5th to 7th');
+    G.DrawStock;
+    Check(G.LastMoveAte, 'the 8th draw is the first feeding');
+    Check(G.Undo and not G.LastMoveAte, 'undo gives the eaten card back');
+    { only the first is skipped: 12th feeds, too }
+    G.DrawStock;
+    for N := 9 to 11 do G.DrawStock;
+    Check(not G.LastMoveAte, 'the 9th to 11th: nothing');
+    G.DrawStock;
+    Check(G.LastMoveAte, 'and the 12th');
+  finally
+    G.Free;
+  end;
+end;
+
+procedure TestBadRelicStates;
+var
+  G, G2: TTriPeaksGame;
+  D: TDeck;
+  A, Bad: THandData;
+begin
+  G := TTriPeaksGame.Create;
+  G2 := TTriPeaksGame.Create;
+  D := TDeck.Create;
+  try
+    D.Shuffle;
+    G.Deal(D);
+    G.SetHazard(hzChained);
+    G.SetRelicRules(True, 1);
+    G.GetState(A);
+    Check(G2.SetState(A), 'a hand with both relic rules is accepted');
+    Bad := A; Bad.BreakStart := 2; Bad.BreakLeft := 2;
+    Check(not G2.SetState(Bad), 'two breaks are refused');
+    Bad := A; Bad.BreakLeft := 2;
+    Check(not G2.SetState(Bad), 'more breaks left than it began with is refused');
+    Bad := A; Bad.BreakLeft := -1;
+    Check(not G2.SetState(Bad), 'a negative count is refused');
+    Bad := A; Bad.BreakStart := 0; Bad.BreakLeft := 0;
+    SetLength(Bad.History, 1);
+    Bad.History[0].Draw := False;
+    Bad.History[0].Index := 0;
+    Bad.History[0].Broke := True;
+    Check(not G2.SetState(Bad), 'a break in the history with no Pick is refused');
+  finally
+    G.Free; G2.Free; D.Free;
+  end;
+end;
+
 procedure TestUndoWholeHand;
 var
   G: TTriPeaksGame;
@@ -706,7 +897,8 @@ begin
     and (A.StockSize = B.StockSize) and (A.Wrap = B.Wrap)
     and (A.Streak = B.Streak) and (A.BestStreak = B.BestStreak) and (A.Plays = B.Plays)
     and (Length(A.Stock) = Length(B.Stock)) and CardsEqual(A.WasteTop, B.WasteTop)
-    and (Length(A.History) = Length(B.History)) and (A.Hazard = B.Hazard);
+    and (Length(A.History) = Length(B.History)) and (A.Hazard = B.Hazard)
+    and (A.FeedSkip = B.FeedSkip) and (A.BreakStart = B.BreakStart) and (A.BreakLeft = B.BreakLeft);
   if not Result then Exit;
   for I := 0 to TableauSize - 1 do
     if not CardsEqual(A.Tableau[I], B.Tableau[I]) or (A.Removed[I] <> B.Removed[I]) or (A.Marks[I] <> B.Marks[I]) then
@@ -716,6 +908,7 @@ begin
   for I := 0 to High(A.History) do
     if (A.History[I].Draw <> B.History[I].Draw) or (A.History[I].Index <> B.History[I].Index)
       or (A.History[I].Missed <> B.History[I].Missed) or (A.History[I].PrevStreak <> B.History[I].PrevStreak)
+      or (A.History[I].Broke <> B.History[I].Broke)
       or (A.History[I].Bitten <> B.History[I].Bitten) or (A.History[I].Ate <> B.History[I].Ate)
       or not CardsEqual(A.History[I].PrevWasteTop, B.History[I].PrevWasteTop) then
       Result := False;
@@ -1185,6 +1378,10 @@ begin
   TestHunger;
   TestTrickStates;
   TestBadTrickStates;
+  TestPick;
+  TestSpoon;
+  TestRelicStates;
+  TestBadRelicStates;
   TestRandomGames;
   TestStateRoundTrip;
   TestStateRestoresBehaviour;

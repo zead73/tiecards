@@ -1482,7 +1482,8 @@ end;
 procedure TWebView.DrawOverlayUi;
 const
   ArtKey: array[0..OverlayArtCount - 1] of string = ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint',
-    'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless');
+    'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless',
+    '', 'relic_garlic', 'relic_pick', 'relic_spoon', 'relic_locket', 'relic_moonstone');
 var
   P, Pt, Sp, R, B, TextR: TRect;
   I: Integer;
@@ -1714,9 +1715,9 @@ begin
   SetFont(Max(16, 14 * K), True, False);
   FillColor(201, 162, 74);
   Text(FCtl.OverlayFooter, R.Left, R.Top + ((R.Bottom - R.Top) - Max(16, 14 * K)) / 2 - 2);
-  if FCtl.OverlayExtraCaption <> '' then              { a button beside Leave: the Store's Style }
+  for I := 0 to FCtl.OverlayExtraCount - 1 do         { buttons beside Leave: the Store's Relics and Style }
   begin
-    R := FCtl.OverlayExtraRect;
+    R := FCtl.OverlayExtraRect(I);
     FillColor(42, 29, 54);
     StrokeColor(110, 90, 46);
     RRect(R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top, 8 * K);
@@ -1724,7 +1725,7 @@ begin
     FCtx.stroke;
     SetFont(Max(16, 14 * K), True, False);
     FillColor(232, 224, 204);
-    S := FCtl.OverlayExtraCaption;
+    S := FCtl.OverlayExtraCaption(I);
     Text(S, R.Left + ((R.Right - R.Left) - TextW(S)) / 2, R.Top + ((R.Bottom - R.Top) - Max(16, 14 * K)) / 2 - 2);
   end;
   R := FCtl.OverlayLeaveRect;

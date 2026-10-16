@@ -9,7 +9,7 @@ unit Session;
 interface
 
 uses
-  SysUtils, Cards, TriPeaks, Inventory, Specials;
+  SysUtils, Cards, TriPeaks, Inventory, Specials, Relics;
 
 type
   { A hand as it can be saved: the cards (and undo) plus the session's own
@@ -18,10 +18,14 @@ type
     Game: THandData;
     Misses: Integer;
     Bites: Integer;               { bitten cards played (Lucien's trick) }
+    Relics: Integer;              { the relics the hand was dealt with (bits: see Relics) }
+    FreeHintUsed: Boolean;        { the Moonstone's free Show move was already used }
   end;
 
   { A Free Play hand was won (and paid): its longest streak and missed moves. }
   TWonEvent = procedure(BestStreak, Misses: Integer) of object;
+  { Asked at every deal: the relics to play the new hand with (bits, see Relics). }
+  TRelicsEvent = function: Integer of object;
 
   THintResult = (
     hrShown,          { hint card spent, playable cards are now highlighted }
@@ -45,6 +49,10 @@ type
     FHazardsOn: Boolean;
     FMissedLast: Boolean;        { the last draw was a missed move }
     FTouched: Boolean;           { a card has been played or drawn in this hand }
+    FRelicProvider: TRelicsEvent;
+    FRelics: Integer;            { the relics equipped: they apply to the next hand dealt }
+    FActiveRelics: Integer;      { the relics the hand on the table was dealt with }
+    FFreeHintUsed: Boolean;
     FCrossClaimed: Boolean;      { a Wild card just took the silver cross: the duel has to hear of it }
     FRestored: Boolean;          { a saved hand was just put back and nothing has been done since }
     FOver: Boolean;              { the hand is finished (lost or given up) }
@@ -54,6 +62,7 @@ type
     function SpecialRescue: Boolean;
     procedure AfterSpecial;
     procedure CheckStuck;
+    procedure ApplyRelics;
     procedure Save;
     procedure CheckWin;
   public
@@ -69,6 +78,17 @@ type
     { The silver cross (see Campaign): lay it under a random peak card of the hand
       just dealt. A Wild card played on it claims it; any other play (or a Wood
       Stake) destroys it. }
+    { ---- relics (see Relics) ---- }
+    procedure SetRelics(AMask: Integer);       { equip: a hand not yet started takes them at once }
+    property Relics: Integer read FRelics write SetRelics;
+    property RelicProvider: TRelicsEvent read FRelicProvider write FRelicProvider;
+    property ActiveRelics: Integer read FActiveRelics;
+    { Missed moves and bitten cards as they are charged: the Steady Locket and the
+      Garlic Wreath forgive the first of each. The raw counts (Misses, Bites) are what
+      Records and the panel show. }
+    function ChargedMisses: Integer;
+    function ChargedBites: Integer;
+    function FreeHintAvailable: Boolean;       { the Moonstone's free Show move is still to come }
     function PlaceCross: Boolean;
     function TakeCrossClaim: Boolean;        { True once after a Wild card claimed it }
     procedure SetNote(const AText: string);
@@ -178,6 +198,42 @@ begin
   FHazard := AHazard;
 end;
 
+procedure TGameSession.SetRelics(AMask: Integer);
+begin
+  if not ValidRelicMask(AMask) then AMask := 0;
+  FRelics := AMask;
+  { the Store's rule: before the first move the hand on the table takes them too }
+  if not FTouched and not FOver and not FGame.IsWon then
+  begin
+    FActiveRelics := FRelics;
+    ApplyRelics;
+  end;
+end;
+
+{ Put the hand's relics into effect: the Spoon and the Pick change the game's rules. }
+procedure TGameSession.ApplyRelics;
+begin
+  FGame.SetRelicRules(HasRelic(FActiveRelics, rlSpoon), Ord(HasRelic(FActiveRelics, rlPick)));
+  FFreeHintUsed := False;
+end;
+
+function TGameSession.ChargedMisses: Integer;
+begin
+  Result := FMisses;
+  if HasRelic(FActiveRelics, rlLocket) and (Result > 0) then Dec(Result);
+end;
+
+function TGameSession.ChargedBites: Integer;
+begin
+  Result := FBites;
+  if HasRelic(FActiveRelics, rlGarlic) and (Result > 0) then Dec(Result);
+end;
+
+function TGameSession.FreeHintAvailable: Boolean;
+begin
+  Result := HasRelic(FActiveRelics, rlMoonstone) and not FFreeHintUsed and not FGame.IsWon;
+end;
+
 function TGameSession.PlaceCross: Boolean;
 begin
   Result := FGame.PlaceCross >= 0;
@@ -212,6 +268,9 @@ begin
   FGame.WrapRanks := FWrapRanks;
   FGame.Deal(ADeck, FStockSize);
   if FHazardsOn then FGame.SetHazard(FHazard);
+  if Assigned(FRelicProvider) then FRelics := FRelicProvider();
+  FActiveRelics := FRelics;                   { the hand keeps the relics it was dealt with }
+  ApplyRelics;
   FMisses := 0;
   FBites := 0;
   FCrossClaimed := False;
@@ -252,14 +311,21 @@ begin
   FGame.GetState(H.Game);
   H.Misses := FMisses;
   H.Bites := FBites;
+  H.Relics := FActiveRelics;
+  H.FreeHintUsed := FFreeHintUsed;
 end;
 
 function TGameSession.ImportHand(const H: TSavedHand): Boolean;
 begin
-  Result := (H.Misses >= 0) and (H.Bites >= 0) and FGame.SetState(H.Game);
+  Result := (H.Misses >= 0) and (H.Bites >= 0) and ValidRelicMask(H.Relics)
+    and (H.Game.FeedSkip = HasRelic(H.Relics, rlSpoon))               { the game's rules agree with its relics }
+    and ((H.Game.BreakStart = 1) = HasRelic(H.Relics, rlPick))
+    and FGame.SetState(H.Game);
   if not Result then Exit;
   FMisses := H.Misses;
   FBites := H.Bites;
+  FActiveRelics := H.Relics;
+  FFreeHintUsed := H.FreeHintUsed;
   FMissedLast := False;
   FHintActive := False;
   FRewarded := False;
@@ -272,7 +338,7 @@ end;
 
 function TGameSession.PayoutNow: Integer;
 begin
-  Result := RewardAfterCuts(WinCoins, FMisses, FBites);
+  Result := RewardAfterCuts(WinCoins, ChargedMisses, ChargedBites);
 end;
 
 function TGameSession.Play(I: Integer): Boolean;
@@ -470,11 +536,12 @@ begin
     Result := hrAlreadyShown
   else if FGame.IsWon then
     Result := hrNoMoves                       { game over: nothing to show, nothing spent }
-  else if FInventory.HintCards <= 0 then
+  else if (FInventory.HintCards <= 0) and not FreeHintAvailable then
     Result := hrNoHintCards
   else
   begin
-    FInventory.UseHintCard;                   { spent whether or not there is a move }
+    if FreeHintAvailable then FFreeHintUsed := True      { the Moonstone's: no card used }
+    else FInventory.UseHintCard;              { spent whether or not there is a move }
     Save;
     if FGame.HasMoves then
     begin

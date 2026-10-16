@@ -64,6 +64,9 @@ Things worth knowing before you read the code:
 - Style (from the start menu or the Store): card backs, table cloths and the colour of the
   moon over the house. A few are bought at fixed prices and a few are earned with a
   vampire's trophy. They only change how the game looks.
+- Relics (the Relics button in the Store): small permanent helps against the hard vampires,
+  such as a lockpick that frees one chained card a hand. Bought at fixed prices (two can also
+  be earned with trophies), carried in slots that grow with each vampire you kill.
 - Progress is saved automatically (the hand after every move, coins and cards as
   they change). The Menu also has manual save slots for both modes.
 

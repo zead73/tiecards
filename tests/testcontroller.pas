@@ -6,7 +6,7 @@ program TestController;
 {$mode objfpc}{$H+}
 
 uses SysUtils, Types, Classes, Cards, TriPeaks, Inventory, Session, Stage, Story, Vampires, Specials,
-  Campaign, Duel, DuelSession, DuelInfo, Settings, HandFile, CampaignSlots, Storage, Records, Trophies, Cosmetics, GameController
+  Campaign, Duel, DuelSession, DuelInfo, Settings, HandFile, CampaignSlots, Storage, Records, Trophies, Cosmetics, Relics, GameController
   {$IFDEF PAS2JS}, JsCompat{$ENDIF};
 
 var
@@ -1596,15 +1596,15 @@ begin
     TapMenuButton(C, 1);
     RunOut(C);
     C.ActionOpenStore;
-    Check(C.OverlayExtraCaption = '', 'no Style button while Fenwick introduces himself');
+    Check(C.OverlayExtraCount = 0, 'no extra buttons while Fenwick introduces himself');
     for I := 1 to 10 do
       if C.OverlayHint <> '' then C.Tap(5, 5);
-    Check(C.OverlayExtraCaption = 'Style', 'the Store offers Style');
-    C.Tap((C.OverlayExtraRect.Left + C.OverlayExtraRect.Right) div 2, (C.OverlayExtraRect.Top + C.OverlayExtraRect.Bottom) div 2);
+    Check((C.OverlayExtraCount = 2) and (C.OverlayExtraCaption(0) = 'Relics') and (C.OverlayExtraCaption(1) = 'Style'), 'the Store offers Relics and Style');
+    C.Tap((C.OverlayExtraRect(1).Left + C.OverlayExtraRect(1).Right) div 2, (C.OverlayExtraRect(1).Top + C.OverlayExtraRect(1).Bottom) div 2);
     Check(C.Overlay = okStyle, 'which opens the page');
     C.ActionCloseOverlay;
     C.ActionOpenCards;
-    Check(C.OverlayExtraCaption = '', 'the card tray has no such button');
+    Check(C.OverlayExtraCount = 0, 'the card tray has no such buttons');
     C.ActionCloseOverlay;
 
     { Erase everything goes back; Restart campaign does not }
@@ -1620,6 +1620,118 @@ begin
     C.ActionEraseEverything;
     RunOut(C);
     Check((C.StyleBack = 0) and not C.Session.Inventory.BoughtCosmetic(ckBack, 1), 'Erase everything takes it all away');
+  finally
+    C.Free; W.Free; D.Free; St.Free;
+  end;
+end;
+
+{ Fenwick's relics: bought, equipped in slots that grow, applied to the hands dealt. }
+procedure TestRelicsPage;
+var
+  St: TStory;
+  C: TGameController;
+  D: TDecks;
+  W: TWatcher;
+  I: Integer;
+begin
+  WipeStore;
+  St := TStory.Create;
+  St.LoadFromFile(StoryPath);
+  D := TDecks.Create;
+  W := TWatcher.Create;
+  C := NewCtl(St, D, W);
+  try
+    C.StartWithMenu;
+    TapMenuButton(C, 1);
+    RunOut(C);
+    C.ActionOpenStore;
+    for I := 1 to 10 do
+      if C.OverlayHint <> '' then C.Tap(5, 5);
+    Check(C.OverlayExtraCaption(0) = 'Relics', 'the Store has a Relics button');
+    C.Tap((C.OverlayExtraRect(0).Left + C.OverlayExtraRect(0).Right) div 2, (C.OverlayExtraRect(0).Top + C.OverlayExtraRect(0).Bottom) div 2);
+    Check(C.Overlay = okRelics, 'which opens the page');
+    C.ActionCloseOverlay;
+    C.ActionOpenStore;
+    C.SetViewport(375, 560);                          { a phone held upright }
+    for I := 0 to C.OverlayExtraCount - 1 do
+      Check(Inside(C.OverlayExtraRect(I), C.OverlayPanelRect) and (C.OverlayExtraRect(I).Right <= C.OverlayLeaveRect.Left),
+        'on a phone, extra button ' + IntToStr(I) + ' fits beside Leave');
+    Check(C.OverlayExtraRect(1).Right <= C.OverlayExtraRect(0).Left, 'and the two do not overlap');
+    C.SetViewport(1520, 584);
+    C.ActionCloseOverlay;
+    C.ActionOpenStore;
+    C.Tap((C.OverlayExtraRect(0).Left + C.OverlayExtraRect(0).Right) div 2, (C.OverlayExtraRect(0).Top + C.OverlayExtraRect(0).Bottom) div 2);
+    Check(C.OverlayRowCount = RelicCount, 'a row for each relic');
+    Check(C.RelicSlotCount = 1, 'one slot to begin with');
+    Check(C.OverlayRow(0).Title = St.RelicName('garlic'), 'named from the story');
+    Check((C.OverlayRow(1).ButtonText = 'Buy') and not C.OverlayRow(1).ButtonEnabled and (C.OverlayRow(1).Aside = Format('%d coins', [RelicPrice(rlPick)])),
+      'the Pick: Buy, too dear for 50 coins');
+    Check(Pos(St.TrophyName('perfect'), C.OverlayRow(3).Detail) > 0, 'the Locket says a trophy also gives it');
+    Check(Pos('Also earned', C.OverlayRow(1).Detail) = 0, 'the Pick is only bought');
+
+    { buy one: it goes into the free slot, and this hand takes it at once }
+    C.Session.Inventory.AddCoins(1000);
+    TapSlotButton(C, 1);
+    Check(C.Session.Inventory.BoughtRelic(rlPick) and C.RelicEquipped(rlPick), 'bought, and equipped in the free slot');
+    Check((C.OverlayRow(1).ButtonText = 'Remove') and (C.OverlayRow(1).Aside = 'equipped'), 'the row says so');
+    Check(HasRelic(C.Session.ActiveRelics, rlPick) and (C.Session.Game.BreaksAtStart = 1), 'a hand not yet started has it already');
+    Check(Pos('Bought', C.GetUi.StatusText) > 0, 'with a message: ' + C.GetUi.StatusText);
+
+    { the slot is full }
+    TapSlotButton(C, 2);
+    Check(C.Session.Inventory.BoughtRelic(rlSpoon) and not C.RelicEquipped(rlSpoon), 'a second is bought but has no slot');
+    Check(Pos('No free slot', C.GetUi.StatusText) > 0, 'and the message says why: ' + C.GetUi.StatusText);
+    Check((C.OverlayRow(2).ButtonText = 'Equip') and not C.OverlayRow(2).ButtonEnabled, 'Equip is off until a slot is free');
+    { a vampire trophy opens another slot }
+    C.Trophies.Award(trVampire0);
+    Check(C.RelicSlotCount = 2, 'a vampire trophy gives a second slot');
+    Check(C.OverlayRow(2).ButtonEnabled, 'now the Spoon can go in');
+    TapSlotButton(C, 2);
+    Check(C.RelicEquipped(rlSpoon) and C.RelicEquipped(rlPick), 'both are equipped');
+    { the Locket is given by the perfect-hand trophy }
+    C.Trophies.Award(trPerfect);
+    Check((C.OverlayRow(3).ButtonText = 'Equip') and (C.OverlayRow(3).Aside = ''), 'the Locket is owned through its trophy');
+    { take one out }
+    TapSlotButton(C, 1);
+    Check(not C.RelicEquipped(rlPick) and (C.Session.Game.BreaksAtStart = 0), 'Remove takes it out of this fresh hand too');
+    Check(C.Session.Inventory.BoughtRelic(rlPick), 'but it is still yours');
+
+    { the Moonstone: a free Show move }
+    C.Trophies.Award(trVampire1);
+    TapSlotButton(C, 4);                          { earned by Carmilla's trophy as well: owned, so Equip }
+    Check(C.RelicEquipped(rlMoonstone), 'the Moonstone is equipped');
+    C.ActionCloseOverlay;
+    Check(C.GetUi.HintCaption = 'Show move (free)', 'the button says the hint is free');
+    Check(C.GetUi.HintEnabled, 'and it works with no hint cards');
+
+    { a hand under way keeps the relics it was dealt with }
+    TapCard(C, 27);
+    C.ActionOpenRelics;
+    TapSlotButton(C, 4);
+    Check(not C.RelicEquipped(rlMoonstone) and HasRelic(C.Session.ActiveRelics, rlMoonstone), 'removed, but this hand keeps it');
+    C.ActionCloseOverlay;
+    C.ActionNew;
+    RunOut(C);
+    Check(not HasRelic(C.Session.ActiveRelics, rlMoonstone) and HasRelic(C.Session.ActiveRelics, rlSpoon), 'the next hand has what is equipped now');
+    C.Free;
+
+    { the choice is saved; losing a trophy (or a slot) trims it }
+    C := NewCtl(St, D, W);
+    C.StartWithMenu;
+    Check(C.RelicEquipped(rlSpoon), 'saved on disk');
+    C.Free;
+    StoreDelete(DefaultTrophiesFile);
+    C := NewCtl(St, D, W);
+    C.StartWithMenu;
+    Check((C.RelicSlotCount = 1) and C.RelicEquipped(rlSpoon) and not C.RelicEquipped(rlPick), 'with one slot only the first kept relic stays');
+    Check(C.Session.Inventory.BoughtRelic(rlPick), 'nothing is lost, it just does not fit');
+
+    { Erase everything }
+    TapMenuButton(C, 1);
+    RunOut(C);
+    C.ActionEraseEverything;
+    RunOut(C);
+    Check(not C.Session.Inventory.BoughtRelic(rlPick) and not C.RelicEquipped(rlSpoon) and not C.RelicEquipped(rlPick), 'Erase everything clears them');
   finally
     C.Free; W.Free; D.Free; St.Free;
   end;
@@ -1980,6 +2092,7 @@ begin
   TestSaveSlots;
   TestDeleteSaves;
   TestStyle;
+  TestRelicsPage;
   TestTrickControls;
   TestCrossControls;
   TestTrophies;

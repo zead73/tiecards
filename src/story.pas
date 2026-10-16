@@ -11,7 +11,7 @@ uses
 {$IFNDEF PAS2JS}
   Classes,
 {$ENDIF}
-  SysUtils, TextIni, Storage, Vampires, Specials, Trophies, Cosmetics;
+  SysUtils, TextIni, Storage, Vampires, Specials, Trophies, Cosmetics, Relics;
 
 type
   TStringArray = array of string;
@@ -78,6 +78,9 @@ type
     { A Style item's name and a line about it. Key is Cosmetics.CosmeticStoryKey ('back.blood'). }
     function StyleName(const Key: string): string;
     function StyleLine(const Key: string): string;
+    { A relic's name and what it does. Key is Relics.RelicKey. }
+    function RelicName(const Key: string): string;
+    function RelicLine(const Key: string): string;
     function Validate: TStringArray;
   end;
 
@@ -318,9 +321,20 @@ begin
   Result := Value('style', Key + '.line');
 end;
 
+function TStory.RelicName(const Key: string): string;
+begin
+  Result := Value('relics', Key + '.name');
+end;
+
+function TStory.RelicLine(const Key: string): string;
+begin
+  Result := Value('relics', Key + '.line');
+end;
+
 function TStory.Validate: TStringArray;
 var
   V, T: Integer;
+  RR: TRelic;
   CK: TCosmeticKind;
   CI: Integer;
   K: TSpecialKind;
@@ -369,6 +383,11 @@ begin
   Need('fenwick', 'pitch.hint');
   Need('finale', 'finale.1');
   Need('finale', 'caption');
+  for RR := Low(TRelic) to High(TRelic) do
+  begin
+    Need('relics', RelicKey(RR) + '.name');
+    Need('relics', RelicKey(RR) + '.line');
+  end;
   for CK := Low(TCosmeticKind) to High(TCosmeticKind) do
     for CI := 0 to CosmeticsPerKind - 1 do
     begin

@@ -37,7 +37,8 @@ const
   FontName = 'Times New Roman';
   ArtKey: array[0..OverlayArtCount - 1] of string =
     ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint',
-     'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless');
+     'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless',
+     '', 'relic_garlic', 'relic_pick', 'relic_spoon', 'relic_locket', 'relic_moonstone');
 
 function Gold: TColor;
 begin
@@ -421,16 +422,16 @@ begin
   C.Font.Style := [fsBold];
   C.Font.Color := Gold;
   C.TextOut(R.Left, R.Top + ((R.Bottom - R.Top) - C.TextHeight('Ag')) div 2, Ctl.OverlayFooter);
-  if Ctl.OverlayExtraCaption <> '' then              { a button beside Leave: the Store's Style }
+  for I := 0 to Ctl.OverlayExtraCount - 1 do         { buttons beside Leave: the Store's Relics and Style }
   begin
-    R := Ctl.OverlayExtraRect;
+    R := Ctl.OverlayExtraRect(I);
     C.Brush.Style := bsSolid;
     C.Brush.Color := RGBToColor(42, 29, 54);
     C.Pen.Color := RGBToColor(110, 90, 46);
     C.RoundRect(R.Left, R.Top, R.Right, R.Bottom, Round(8 * K), Round(8 * K));
     C.Brush.Style := bsClear;
     C.Font.Color := Bone;
-    S := Ctl.OverlayExtraCaption;
+    S := Ctl.OverlayExtraCaption(I);
     C.TextOut(R.Left + ((R.Right - R.Left) - C.TextWidth(S)) div 2,
       R.Top + ((R.Bottom - R.Top) - C.TextHeight(S)) div 2, S);
   end;
