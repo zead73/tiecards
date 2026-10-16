@@ -167,9 +167,9 @@ Ideas to review later.
       campaign only" redoes the story and keeps your coins and cards.
 - [x] **All duel scenes wait for clicks.** Done: intro, free round, fatal blow,
       defeat and finale lines all wait for a click (Esc still skips a scene).
-- [ ] **Story tweaks.** Play a duel or two, then mark up the dialogue
-      (`assets/story/story.ini`) and adjust the pacing (line hold times in
-      `src/scenes.pas` are now unused by the duel scenes).
+- [x] **Story tweaks.** The user is happy with the story as it is now (2026-10-16). The
+      dialogue is in `assets/story/story.ini`; the line hold times in `src/scenes.pas`
+      are unused by the duel scenes.
 - [x] **Mid-hand vampire effects.** Done 2026-10-12: bites, chains and hunger (see the
       tricks entry), and the silver cross (2026-10-13).
 - [ ] **Items.** Jokers, gems, or similar things you can buy or win. Fixed
