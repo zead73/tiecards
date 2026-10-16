@@ -56,6 +56,17 @@ Things worth knowing before you read the code:
 - Progress is saved automatically (the hand after every move, coins and cards as
   they change). The Menu also has manual save slots for both modes.
 
+### On a tablet or phone
+
+Open the web version in the browser. Your progress (coins, cards, the campaign and
+saved hands) is kept in the browser on that device, separate from the desktop game
+and from other devices.
+
+On an iPad or iPhone, Safari deletes a site's saved data after seven days of Safari
+use with no visit to that site. A page added to the Home Screen is exempt, so open
+the page, tap **Share**, then **Add to Home Screen**, and start the game from that
+icon. The game also asks the browser to keep its data.
+
 ## Building
 
 Everything below is run from the project folder.

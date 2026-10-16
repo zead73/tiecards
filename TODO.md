@@ -120,9 +120,10 @@ Ideas to review later.
       feel, the sound (it cannot be heard from here), the text sizes, the
       phone-sized panel strip (a little cramped under about 500 px wide).
 - [x] **Offline play** done (service worker, 2026-10-10); needs https.
-- [ ] **iPad saves:** Safari deletes a site's saved data after seven days of
+- [x] **iPad saves:** Safari deletes a site's saved data after seven days of
       Safari use with no visit to the site; a page added to the Home Screen is
-      exempt. Tell the tablet player to use Share > Add to Home Screen.
+      exempt. The advice (Share > Add to Home Screen) is in `README.md` and
+      `web/README.md` (2026-10-16).
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
 ## Linux icon (2026-10-16)
