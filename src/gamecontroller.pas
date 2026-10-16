@@ -23,7 +23,7 @@ interface
 uses
   SysUtils, Types, Math, Cards, TriPeaks, Inventory, Session, Sound, Anim, Stage,
   NewGameAnim, Vampires, Story, Campaign, Duel, DuelSession, DuelInfo, Scenes,
-  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules;
+  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules, Trophies;
 
 const
   { The table is laid out on a fixed design grid and scaled to fit. }
@@ -79,7 +79,7 @@ type
 
   { The Store (Fenwick's goods) and the tray of your own special cards are two
     overlays drawn over the table; both are a list of rows with a button. }
-  TOverlayKind = (okNone, okStore, okCards, okRecords, okSlots);
+  TOverlayKind = (okNone, okStore, okCards, okRecords, okSlots, okTrophies);
 
   TOverlayRow = record
     Title, Detail: string;
@@ -95,6 +95,11 @@ const
   StoreGoodCount = SpecialCount + 2;       { the six cards, undo cards and hint cards }
   ArtUndo = SpecialCount;
   ArtHint = SpecialCount + 1;
+  { The trophy page reuses the picture slots after the Store's goods: ArtTrophy0 + the
+    trophy's number, or ArtTrophyEmpty for a trophy not earned yet (an empty tile). }
+  ArtTrophy0 = StoreGoodCount;
+  ArtTrophyEmpty = StoreGoodCount + TrophyCount;
+  OverlayArtCount = ArtTrophyEmpty;          { pictures to load: the goods and the trophies }
 
 type
   TChangeEvent = procedure of object;
@@ -121,6 +126,8 @@ type
     FInScene: Boolean;
     FAllowBottomPanel: Boolean;
     FToast: string;
+    FTrophies: TTrophies;
+    FNews: string;             { 'Trophy earned: ...' until the next tap on the table }
     FRulesShow: Boolean;       { the rules are being shown (by the front end) }
     FCrossAsk: Integer;        { the silver cross card a tap is waiting to destroy (-1 = none) }
     FOnChange: TChangeEvent;
@@ -145,6 +152,7 @@ type
     FScale: Double;
     FOffX, FOffY: Integer;
     procedure Changed;
+    procedure EarnTrophy(T: TTrophy);
     procedure SessionWon(BestStreak, Misses: Integer);
     procedure DuelWon(V, TotalLost, BestStreak, Misses: Integer; Kill: Boolean);
     function NeedInitials: Boolean;
@@ -284,6 +292,11 @@ type
     procedure ActionOpenRecords;
     procedure ActionSubmitInitials(const S: string);     { '' = skip }
     procedure ActionAnswerCross(APlayIt: Boolean);       { the question in UiState.AskCross }
+    { ---- trophies: the shelf in the side panel and the page it opens ---- }
+    property Trophies: TTrophies read FTrophies;
+    function TrophyLayout: TTrophyLayout;      { the shelf's rectangles (empty with no panel) }
+    function TrophyArt(I: Integer): Integer;   { the picture slot to draw for shelf slot I }
+    procedure ActionOpenTrophies;
     procedure ActionRulesClosed;                         { the rules shown for UiState.ShowRules were dismissed }
     function RulesSectionCount: Integer;
     function RulesHeading(I: Integer): string;
@@ -345,6 +358,8 @@ begin
   FDuel := TDuelSession.Create(FSession, FCampaign);
   FSettings := TSettings.Create(DefaultSettingsFile);
   FRecords := TRecords.Create(DefaultRecordsFile);
+  FTrophies := TTrophies.Create(DefaultTrophiesFile);
+  if FTrophies.IsNew then FTrophies.SeedFrom(FRecords, FCampaign.Current);   { what the records already prove }
   FSession.OnWon := @SessionWon;
   FDuel.OnHandWon := @DuelWon;
   FHooks.OnToll := @HookToll;
@@ -361,6 +376,7 @@ begin
   FStage.Free;
   FDuel.Free;
   FSettings.Free;
+  FTrophies.Free;
   FRecords.Free;
   FCampaign.Free;
   FSession.Free;          { saves the inventory }
@@ -941,6 +957,8 @@ begin
 end;
 
 function TGameController.PanelStats: TPanelStats;
+var
+  I: Integer;
 begin
   Result.Remaining := FGame.Remaining;
   Result.Stock := FGame.StockCount;
@@ -952,6 +970,10 @@ begin
   Result.Misses := FSession.Misses;
   Result.PayNow := FSession.PayoutNow;
   Result.MissCut := WinCoins - Result.PayNow;
+  Result.Trophies := 0;
+  for I := 0 to TrophyCount - 1 do
+    if FTrophies.Has(TTrophy(I)) then Result.Trophies := Result.Trophies or (1 shl I);
+  Result.TrophyCount := FTrophies.Count;
 end;
 
 function TGameController.DuelInfo: TDuelInfo;
@@ -1015,6 +1037,7 @@ begin
   if FTargeting then
     S := SpecialName[FTargetKind] + ': tap a free card (any other tap cancels).   ' + S;
   if FToast <> '' then S := FToast + '   ' + S;
+  if FNews <> '' then S := FNews + '   ' + S;
   S := Trim(S);
   Result.StatusText := S;
   Result.UndoCaption := Format('Undo (%d)', [Inv.UndoCards]);
@@ -1338,7 +1361,8 @@ begin
   DropFx;
   FStage.ResetScene;
   FPending := [];
-  EraseEverything(FSession, FCampaign, FSettings, FRecords, ExtractFilePath(DefaultInventoryFile));
+  EraseEverything(FSession, FCampaign, FSettings, FRecords, FTrophies, ExtractFilePath(DefaultInventoryFile));
+  FNews := '';
   FDuel.Duel.Start;                      { the campaign is at the first vampire again }
   DoNewGame;
   FToast := 'Everything was erased: a fresh start.';
@@ -1540,6 +1564,13 @@ begin
       SkipDeal;                 { a click skips the deal }
     Exit;
   end;
+  { the trophy shelf in the side panel opens the trophy page (also on the win screen) }
+  if (PanelPlacement <> ppNone) and not FTargeting
+    and PtInRect(TrophyLayout.Shelf, Point(X, Y)) then
+  begin
+    ActionOpenTrophies;
+    Exit;
+  end;
   if FCampaignMode then
   begin
     if FDuel.Duel.State = dsComplete then
@@ -1561,6 +1592,7 @@ begin
   end;
   P := Point(X, Y);
   FToast := '';
+  FNews := '';
   if FCampaignMode then
   begin
     if PtInRect(StockRect, P) then
@@ -1813,6 +1845,7 @@ begin
     okCards: Result := SpecialCount;
     okRecords: Result := 10 + 2;             { two headings, ten records }
     okSlots: if FSlotsSave then Result := 4 else Result := 8;   { headings and three slots a mode }
+    okTrophies: Result := TrophyCount;
   else
     Result := 0;
   end;
@@ -1843,6 +1876,24 @@ begin
   if FOverlay = okSlots then
   begin
     Result := SlotRow(I);
+    Exit;
+  end;
+  if FOverlay = okTrophies then
+  begin
+    Result.Art := TrophyArt(I);
+    Result.Selected := False;
+    if FTrophies.Has(TTrophy(I)) then
+    begin
+      Result.Title := FStory.TrophyName(TrophyKeys[TTrophy(I)]);
+      Result.Detail := FStory.TrophyLine(TrophyKeys[TTrophy(I)]);
+      Result.Aside := '';                    { the picture says it; the text gets the room }
+    end
+    else
+    begin
+      Result.Title := FStory.TrophyName(TrophyKeys[TTrophy(I)]);
+      Result.Detail := FStory.TrophyHow(TrophyKeys[TTrophy(I)]);
+      Result.Aside := '';
+    end;
     Exit;
   end;
   if I < SpecialCount then
@@ -1900,6 +1951,7 @@ begin
     okCards: Result := 'Your special cards';
     okRecords: Result := 'Your records';
     okSlots: if FSlotsSave then Result := 'Save game' else Result := 'Load game';
+    okTrophies: Result := 'Your trophies';
   else
     Result := '';
   end;
@@ -1913,6 +1965,8 @@ begin
       Result := 'Pick a card to use it. The Wild card and Wood Stake then ask you to tap a free card. Dimmed cards would do nothing now.';
     okRecords:
       Result := 'Your best results on this device. Only won hands count.';
+    okTrophies:
+      Result := 'Keepsakes from the vampires, and from how you play. They stay with you, even if you start the campaign again.';
     okSlots:
       if FSlotsSave then
       begin
@@ -1937,6 +1991,8 @@ function TGameController.OverlayFooter: string;
 begin
   if FOverlay = okStore then
     Result := Format('Coins: %d', [FSession.Inventory.Coins])
+  else if FOverlay = okTrophies then
+    Result := Format('%d of %d earned', [FTrophies.Count, TrophyCount])
   else
     Result := '';
 end;
@@ -2001,7 +2057,7 @@ begin
   begin
     SpeechH := 72;
     if (FVH < 420) or (FVW < 520) then SpeechH := 90;
-    if (FOverlay = okRecords) or (FOverlay = okSlots) then SpeechH := 62;
+    if (FOverlay = okRecords) or (FOverlay = okSlots) or (FOverlay = okTrophies) then SpeechH := 62;
     L.Speech := Rect(L.X0, L.Panel.Top + Pad, L.X1, L.Panel.Top + Pad + SpeechH);
     L.RowsTop := L.Speech.Bottom + Pad;
   end;
@@ -2229,19 +2285,39 @@ end;
 
 { ---- personal records ---- }
 
+{ A trophy earned: say so (the status line keeps the news until the next tap on the table). }
+procedure TGameController.EarnTrophy(T: TTrophy);
+var
+  Name: string;
+begin
+  if not FTrophies.Award(T) then Exit;
+  Name := FStory.TrophyName(TrophyKeys[T]);
+  if FNews = '' then FNews := 'Trophy earned: ' + Name
+  else FNews := FNews + ', ' + Name;
+end;
+
 procedure TGameController.SessionWon(BestStreak, Misses: Integer);
 begin
-  if not FCampaignMode then
-    FPending := FPending + FRecords.FreePlayWon(BestStreak, Misses);
+  if FCampaignMode then Exit;
+  FPending := FPending + FRecords.FreePlayWon(BestStreak, Misses);
+  EarnTrophy(trFirstWin);
+  if Misses = 0 then EarnTrophy(trPerfect);
 end;
 
 procedure TGameController.DuelWon(V, TotalLost, BestStreak, Misses: Integer; Kill: Boolean);
 begin
   FPending := FPending + FRecords.CampaignHandWon(BestStreak);
+  EarnTrophy(trFirstWin);
+  if Misses = 0 then EarnTrophy(trPerfect);
   if Kill then
   begin
     FPending := FPending + FRecords.CampaignKill(V, TotalLost);
-    if V = VampireCount - 1 then FRecords.CampaignCompleted;
+    EarnTrophy(TrophyForVampire(V));
+    if V = VampireCount - 1 then
+    begin
+      FRecords.CampaignCompleted;
+      if FCampaign.LostAll = 0 then EarnTrophy(trFlawless);
+    end;
   end;
 end;
 
@@ -2327,6 +2403,27 @@ end;
 function TGameController.RulesPlainText: string;
 begin
   Result := Rules.RulesPlainText(FStory);
+end;
+
+function TGameController.TrophyLayout: TTrophyLayout;
+begin
+  Result := TrophyLayoutFor(PanelRect, PanelPlacement = ppBottom);
+end;
+
+function TGameController.TrophyArt(I: Integer): Integer;
+begin
+  if (I >= 0) and (I < TrophyCount) and FTrophies.Has(TTrophy(I)) then Result := ArtTrophy0 + I
+  else Result := ArtTrophyEmpty;
+end;
+
+procedure TGameController.ActionOpenTrophies;
+begin
+  if FMenuOpen then Exit;
+  if Animating and FInScene then Exit;
+  if Animating then SkipDeal;
+  CloseModes;
+  FOverlay := okTrophies;
+  Changed;
 end;
 
 procedure TGameController.ActionOpenRecords;

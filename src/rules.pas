@@ -12,7 +12,7 @@ unit Rules;
 interface
 
 uses
-  SysUtils, TriPeaks, Specials, Inventory, Vampires, Duel, Story, HandFile;
+  SysUtils, TriPeaks, Specials, Inventory, Vampires, Duel, Story, HandFile, Trophies;
 
 function RulesSectionCount: Integer;
 function RulesHeading(I: Integer; AStory: TStory): string;
@@ -27,7 +27,7 @@ const
 implementation
 
 const
-  Sections = 11;
+  Sections = 12;
   RankNames: array[0..VampireCount - 1] of string = ('Jack', 'Queen', 'King');
 
 function RulesSectionCount: Integer;
@@ -48,6 +48,7 @@ begin
     7: Result := 'The vampires and their tricks';
     8: Result := 'The silver cross';
     9: Result := 'Saving your game';
+    10: Result := 'Trophies';
   else
     Result := 'Free Play and Records';
   end;
@@ -190,6 +191,25 @@ begin
     'Start over lets you restart the Campaign only, or erase everything.';
 end;
 
+function BodyTrophies(AStory: TStory): string;
+var
+  T: TTrophy;
+  List: string;
+begin
+  List := '';
+  for T := Low(TTrophy) to High(TTrophy) do
+  begin
+    if List <> '' then List := List + RulesBreak;
+    List := List + AStory.TrophyName(TrophyKeys[T]) + ': ' + AStory.TrophyHow(TrophyKeys[T]);
+  end;
+  Result :=
+    'Trophies are keepsakes you earn by playing, and they are always earned the same way: nothing about them is random.' + RulesBreak +
+    List + RulesBreak +
+    'They sit on a shelf at the foot of the side panel: a small picture for each one you have, and an empty tile for the rest. Tap the shelf to see their names and what each one says. On a narrow screen the shelf is a single Trophies button.' + RulesBreak +
+    'Starting the Campaign again keeps your trophies. Only Erase everything clears them.' + RulesBreak +
+    'Trophies you already deserved from your earlier wins and kills were put on the shelf the first time the game started with trophies. The flawless trophy is only earned in a run that is played from the start.';
+end;
+
 function BodyFree(AStory: TStory): string;
 begin
   Result :=
@@ -214,6 +234,7 @@ begin
     7: Result := BodyVampires(AStory);
     8: Result := BodyCross(AStory);
     9: Result := BodySaving(AStory);
+    10: Result := BodyTrophies(AStory);
   else
     Result := BodyFree(AStory);
   end;

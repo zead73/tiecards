@@ -13,7 +13,7 @@ interface
 
 uses
   JS, Web, SysUtils, Math, Types, Cards, TriPeaks, Stage, Vampires, DuelInfo,
-  GameController;
+  Trophies, GameController;
 
 const
   PortraitLevels = 12;               { brightness steps for fading a portrait }
@@ -63,6 +63,7 @@ type
     procedure DrawPanelColumn(const R: TRect; const Info: TDuelInfo; const St: TPanelStats);
     procedure DrawPanelStrip(const R: TRect; const Info: TDuelInfo; const St: TPanelStats);
     procedure DrawStatsBlock(X0, X1, Y, K: Double; const St: TPanelStats);
+    procedure DrawTrophyShelf(const L: TTrophyLayout; const St: TPanelStats);
     procedure DrawFreeColumn(X0, X1, Y, Bottom, K: Double; const St: TPanelStats);
     procedure DrawFreeStrip(const R: TRect; const St: TPanelStats);
     procedure PanelFrame(const R: TRect; K: Double);
@@ -951,6 +952,53 @@ begin
   Result := 10 * K + 3 * Max(8, 11 * K) * PtToPx * 1.3;
 end;
 
+{ The trophy shelf: a small card for each trophy (an outlined tile for one not
+  earned yet), or in a narrow strip one chip with the count. A tap on it opens
+  the trophy page (the controller). }
+procedure TWebView.DrawTrophyShelf(const L: TTrophyLayout; const St: TPanelStats);
+var
+  I: Integer;
+  H, W, X, Px, Gap: Double;
+begin
+  if L.Shelf.Right <= L.Shelf.Left then Exit;
+  StrokeColor(110, 90, 46);
+  FCtx.lineWidth := 1;
+  if L.Chip then
+  begin
+    H := L.Shelf.Bottom - L.Shelf.Top;
+    FillColor(30, 19, 38);
+    RRect(L.Shelf.Left, L.Shelf.Top, L.Shelf.Right - L.Shelf.Left, H, 6);
+    FCtx.fill;
+    FCtx.stroke;
+    Px := Max(10, H * 0.46);
+    SetFont(Px, True, False);
+    FillColor(201, 162, 74);
+    CenterText(L.Shelf.Left, L.Shelf.Right, L.Shelf.Top + (H - Px * 1.2) / 2,
+      Format('Trophies %d/%d', [St.TrophyCount, TrophyCount]), Px);
+    Exit;
+  end;
+  Gap := Max(2, (L.Reserved - (L.Shelf.Bottom - L.Shelf.Top)) / 2);
+  FCtx.beginPath;
+  FCtx.moveTo(L.Shelf.Left, L.Shelf.Top - Gap);
+  FCtx.lineTo(L.Shelf.Right, L.Shelf.Top - Gap);
+  FCtx.stroke;
+  for I := 0 to TrophyCount - 1 do
+  begin
+    H := L.Slots[I].Bottom - L.Slots[I].Top;
+    W := H * 164 / 232;
+    X := L.Slots[I].Left + ((L.Slots[I].Right - L.Slots[I].Left) - W) / 2;
+    if (St.Trophies shr I) and 1 = 1 then
+      FCtx.drawImage(ImageOf('special_trophy_' + TrophyKeys[TTrophy(I)]), X, L.Slots[I].Top, W, H)
+    else
+    begin
+      FillColor(30, 19, 38);
+      RRect(X, L.Slots[I].Top, W, H, Max(3, H / 8));
+      FCtx.fill;
+      FCtx.stroke;
+    end;
+  end;
+end;
+
 procedure TWebView.DrawStatsBlock(X0, X1, Y, K: Double; const St: TPanelStats);
 var
   Px, RowH, Mid, Gap: Double;
@@ -1045,6 +1093,7 @@ begin
   if K < 0.6 then K := 0.6;
   Pad := Round(12 * K);
   PanelFrame(R, K);
+  DrawTrophyShelf(TrophyLayoutFor(R, True), St);
   Mid := R.Left + W * 0.5;
   Y := R.Top + Pad;
   Px := Max(11, 9 * K) * PtToPx;
@@ -1081,6 +1130,7 @@ procedure TWebView.DrawPanelColumn(const R: TRect; const Info: TDuelInfo; const 
 var
   W, H, K, Pad, X0, X1, Y, PH, PW, RowH, Bottom, Px: Double;
   S: string;
+  TL: TTrophyLayout;
   function F(Size: Double): Double;
   begin
     Result := Max(8, Size * K) * PtToPx;
@@ -1093,10 +1143,12 @@ begin
   Pad := Round(14 * K);
   X0 := R.Left + Pad;
   X1 := R.Right - Pad;
-  Bottom := R.Bottom - Pad - StatsHeight(K);          { the stats block sits below }
+  TL := TrophyLayoutFor(R, False);
+  Bottom := R.Bottom - Pad - TL.Reserved - StatsHeight(K);   { the stats block, and the trophy shelf under it, sit below }
   PanelFrame(R, K);
   Y := R.Top + Pad;
-  DrawStatsBlock(X0, X1, R.Bottom - Pad - StatsHeight(K) + 2 * K, K, St);
+  DrawStatsBlock(X0, X1, R.Bottom - Pad - TL.Reserved - StatsHeight(K) + 2 * K, K, St);
+  DrawTrophyShelf(TL, St);
   if not Info.Active then
   begin
     DrawFreeColumn(X0, X1, Y, Bottom, K, St);
@@ -1109,6 +1161,7 @@ begin
   Y := Y + CenterText(X0, X1, Y, Format('DUEL %d OF %d', [Info.DuelNumber, Info.DuelCount]), Px) + 6 * K;
 
   if Info.StuckWaiting then PH := Round(H * 0.20) else PH := Round(H * 0.28);
+  PH := PH - Round(TL.Reserved * 0.6);                { the shelf needs room too }
   PH := Min(Round((X1 - X0) * 878 / 596), PH);
   PW := Round(PH * 596 / 878);
   DrawPortraitIn(Info.Vampire, R.Left + (W - PW) / 2, Y, PW, PH, 1);
@@ -1213,6 +1266,7 @@ procedure TWebView.DrawPanelStrip(const R: TRect; const Info: TDuelInfo; const S
 var
   W, H, K, Pad, PH, PW, X, Y, MidL, MidR, RightL, RightR, Px, RowH: Double;
   S: string;
+  TL: TTrophyLayout;
   function F(Size: Double): Double;
   begin
     Result := Max(11, Size * K) * PtToPx;
@@ -1224,7 +1278,10 @@ begin
   if K < 0.6 then K := 0.6;
   Pad := Round(12 * K);
   PanelFrame(R, K);
+  TL := TrophyLayoutFor(R, True);
+  DrawTrophyShelf(TL, St);
   PH := H - 2 * Pad;
+  if TL.Chip then PH := PH - TL.Reserved;            { the chip sits under the portrait }
   PW := Round(PH * 596 / 878);
   DrawPortraitIn(Info.Vampire, R.Left + Pad, R.Top + Pad, PW, PH, 1);
   MidL := R.Left + Pad + PW + Pad;
@@ -1352,7 +1409,8 @@ end;
 
 procedure TWebView.DrawOverlayUi;
 const
-  ArtKey: array[0..7] of string = ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint');
+  ArtKey: array[0..OverlayArtCount - 1] of string = ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint',
+    'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless');
 var
   P, Pt, Sp, R, B, TextR: TRect;
   I: Integer;
@@ -1466,10 +1524,24 @@ begin
     begin
       IconH := R.Bottom - R.Top - 8;
       IconW := IconH * 164 / 232;
-      FCtx.drawImage(ImageOf('special_' + ArtKey[Row.Art]), R.Left + 6, R.Top + 4, IconW, IconH);
+      if Row.Art = ArtTrophyEmpty then
+      begin
+        { a trophy not earned yet: an empty tile, the same shape as the pictures }
+        FillColor(22, 13, 28);
+        StrokeColor(110, 90, 46);
+        RRect(R.Left + 6, R.Top + 4, IconW, IconH, Max(4, IconH / 8));
+        FCtx.fill;
+        FCtx.stroke;
+        SetFont(Max(10, IconH * 0.5), True, False);
+        FillColor(110, 90, 46);
+        CenterText(R.Left + 6, R.Left + 6 + IconW, R.Top + 4 + (IconH - Max(10, IconH * 0.5) * 1.2) / 2, '?', Max(10, IconH * 0.5));
+      end
+      else
+        FCtx.drawImage(ImageOf('special_' + ArtKey[Row.Art]), R.Left + 6, R.Top + 4, IconW, IconH);
       X := R.Left + 6 + IconW + 10 * K;
     end;
     if Row.ButtonText <> '' then TextR := Rect(Round(X), R.Top, B.Left - 70, R.Bottom)
+    else if Row.Aside = '' then TextR := Rect(Round(X), R.Top, R.Right - 12, R.Bottom)
     else TextR := Rect(Round(X), R.Top, R.Right - 150, R.Bottom);
     if R.Bottom - R.Top >= 28 then
     begin

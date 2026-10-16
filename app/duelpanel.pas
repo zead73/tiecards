@@ -9,7 +9,7 @@ unit DuelPanel;
 interface
 
 uses
-  Classes, SysUtils, Types, Math, Graphics, DuelInfo, SceneView;
+  Classes, SysUtils, Types, Math, Graphics, DuelInfo, SceneView, Trophies;
 
 { Draws the panel filling R. View supplies (and caches) the portrait. In a duel
   (Info.Active) it shows the vampire; otherwise (Free Play) what a hand pays.
@@ -140,6 +140,23 @@ begin
   Result := Round(10 * K) + 3 * (C.TextHeight('Ag') + Round(2 * K));
 end;
 
+{ The trophy shelf: a divider, then a small card for each trophy (an empty tile
+  for one not earned yet). Tapping it opens the trophy page (the controller). }
+procedure DrawTrophyShelf(C: TCanvas; const L: TTrophyLayout; const S: TPanelStats;
+  View: TSceneView);
+var
+  I: Integer;
+begin
+  if L.Shelf.Right <= L.Shelf.Left then Exit;
+  C.Pen.Style := psSolid;
+  C.Pen.Width := 1;
+  C.Pen.Color := RGBToColor(110, 90, 46);
+  C.Line(L.Shelf.Left, L.Shelf.Top - Max(2, (L.Reserved - (L.Shelf.Bottom - L.Shelf.Top)) div 2),
+    L.Shelf.Right, L.Shelf.Top - Max(2, (L.Reserved - (L.Shelf.Bottom - L.Shelf.Top)) div 2));
+  for I := 0 to TrophyCount - 1 do
+    View.DrawTrophy(C, I, L.Slots[I], (S.Trophies shr I) and 1 = 1);
+end;
+
 { A divider and the numbers: cards left and stock, streak and best, coins. }
 procedure DrawStats(C: TCanvas; X0, X1, Y: Integer; K: Double; const S: TPanelStats);
 var
@@ -168,6 +185,7 @@ var
   W, H, Pad, X0, X1, Y, PH, PW, Th, RowH, Bottom, I, D, Gap, PX: Integer;
   K: Double;
   PR: TRect;
+  TL: TTrophyLayout;
   S: string;
 
   function F(Size: Double): Integer;
@@ -184,7 +202,8 @@ begin
   Th := Max(1, Round(2 * K));
   X0 := R.Left + Pad;
   X1 := R.Right - Pad;
-  Bottom := R.Bottom - Pad - StatsHeight(C, K);       { the stats block sits below }
+  TL := TrophyLayoutFor(R, False);
+  Bottom := R.Bottom - Pad - TL.Reserved - StatsHeight(C, K);   { the stats block, and the trophy shelf under it, sit below }
 
   { the frame }
   C.Brush.Style := bsSolid;
@@ -201,7 +220,8 @@ begin
   C.Font.Name := FontName;
 
   Y := R.Top + Pad;
-  DrawStats(C, X0, X1, R.Bottom - Pad - StatsHeight(C, K) + Round(2 * K), K, Stats);
+  DrawStats(C, X0, X1, R.Bottom - Pad - TL.Reserved - StatsHeight(C, K) + Round(2 * K), K, Stats);
+  DrawTrophyShelf(C, TL, Stats, View);
   C.Brush.Style := bsClear;
   if not Info.Active then
   begin
@@ -220,6 +240,7 @@ begin
   { the portrait: as tall as fits, but never more than 36% of the panel; when
     stuck, smaller (26%) so the prompt at the bottom always has room }
   if Info.StuckWaiting then PH := Round(H * 0.20) else PH := Round(H * 0.28);
+  PH := PH - Round(TL.Reserved * 0.6);                { the shelf needs room too }
   PH := Min(Round((X1 - X0) * 878 / 596), PH);
   PW := Round(PH * 596 / 878);
   PR := Rect(R.Left + (W - PW) div 2, Y, R.Left + (W - PW) div 2 + PW, Y + PH);

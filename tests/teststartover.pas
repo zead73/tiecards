@@ -2,7 +2,7 @@ program TestStartOver;
 
 {$mode objfpc}{$H+}
 
-uses SysUtils, Classes, Inventory, Session, Campaign, Settings, HandFile, StartOver, Records{$IFDEF PAS2JS}, JsCompat{$ENDIF};
+uses SysUtils, Classes, Inventory, Session, Campaign, Settings, HandFile, StartOver, Records, Trophies{$IFDEF PAS2JS}, JsCompat{$ENDIF};
 
 var
   Failures: Integer = 0;
@@ -91,9 +91,11 @@ var
   St2: TSettings;
   N: Integer;
   Rec: TRecords;
+  Tro: TTrophies;
 begin
   Dir := MakeDir;
   Rec := TRecords.Create(Dir + 'records.ini');
+  Tro := TTrophies.Create(Dir + 'trophies.ini');
   FI := Dir + 'inventory.ini';
   FC := Dir + 'campaign.ini';
   FS := Dir + 'settings.ini';
@@ -116,8 +118,12 @@ begin
     St.Mode := gmCampaign;
     St.Save;
 
-    EraseEverything(S, C, St, Rec, Dir);
+    Tro.Award(trFirstWin);
+    Tro.Award(trVampire1);
+    EraseEverything(S, C, St, Rec, Tro, Dir);
     Check(not Rec.IsSet(rcFreeStreak) and (Rec.FreeWins = 0), 'the personal records are erased too');
+    Check((Tro.Count = 0) and not Tro.Has(trFirstWin), 'and the trophies');
+    Check(TTrophies.Create(Dir + 'trophies.ini').Count = 0, 'saved: no trophies');
 
     Check(S.Inventory.Coins = StartingCoins, 'coins are back to the starting amount');
     Check((S.Inventory.UndoCards = 0) and (S.Inventory.HintCards = 0), 'no undo or hint cards');
@@ -152,10 +158,10 @@ begin
     end;
 
     { erasing when there is nothing to erase is fine }
-    EraseEverything(S, C, St, Rec, Dir);
+    EraseEverything(S, C, St, Rec, Tro, Dir);
     Check(S.Inventory.Coins = StartingCoins, 'erasing twice is harmless');
   finally
-    Rec.Free; St.Free; C.Free; S.Free;
+    Tro.Free; Rec.Free; St.Free; C.Free; S.Free;
     CleanDir(Dir);
   end;
 end;

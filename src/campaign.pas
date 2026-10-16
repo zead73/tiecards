@@ -22,6 +22,7 @@ type
     FCurrent: Integer;
     FLostHands: Integer;
     FTotalLost: Integer;
+    FLostAll: Integer;       { lost hands in the whole campaign so far (never reset by a kill) }
     FWins: Integer;
     FPremiseSeen: Boolean;
     FKillPending: Boolean;
@@ -70,6 +71,7 @@ type
     property EaseLive: Boolean read FEaseLive;
     property Current: Integer read FCurrent;        { 0..VampireCount; = count when done }
     property LostHands: Integer read FLostHands;    { since the last win in the current duel }
+    property LostAll: Integer read FLostAll;        { all duels together: 0 at the end earns the Flawless trophy }
     property TotalLost: Integer read FTotalLost;    { in the whole duel with this vampire (for Records) }
     property Wins: Integer read FWins;              { against the current vampire, 0..WinsToKill }
     property PremiseSeen: Boolean read FPremiseSeen;
@@ -101,6 +103,7 @@ begin
       FLostHands := Ini.ReadInteger('Campaign', 'LostHands', 0);
       FWins := Ini.ReadInteger('Campaign', 'Wins', 0);
       FTotalLost := Ini.ReadInteger('Campaign', 'TotalLost', 0);
+      FLostAll := Ini.ReadInteger('Campaign', 'LostAll', -1);
       FPremiseSeen := Ini.ReadBool('Campaign', 'PremiseSeen', False);
       FKillPending := Ini.ReadBool('Campaign', 'KillPending', False);
       FCrossGame := Ini.ReadInteger('Campaign', 'CrossGame', -2);
@@ -115,6 +118,16 @@ begin
     if FLostHands < 0 then FLostHands := 0;
     if FWins < 0 then FWins := 0;
     if FTotalLost < 0 then FTotalLost := 0;
+    if FLostAll < 0 then                      { a file from before this was counted }
+    begin
+      if (FCurrent > 0) or (FWins > 0) or (FTotalLost > 0) then
+      begin
+        FLostAll := FTotalLost;               { history unknown: it cannot prove a flawless run }
+        if FLostAll < 1 then FLostAll := 1;
+      end
+      else
+        FLostAll := 0;
+    end;
     if (FEase < -1) or (FEase > 9) then FEase := 0;
     if (FCurrent < 1) or (FCurrent > 2) then
     begin
@@ -141,6 +154,7 @@ begin
   FCurrent := 0;
   FLostHands := 0;
   FTotalLost := 0;
+  FLostAll := 0;
   FWins := 0;
   FPremiseSeen := False;
   FKillPending := False;
@@ -156,6 +170,7 @@ begin
   Ini.WriteInteger('Campaign', 'LostHands', FLostHands);
   Ini.WriteInteger('Campaign', 'Wins', FWins);
   Ini.WriteInteger('Campaign', 'TotalLost', FTotalLost);
+  Ini.WriteInteger('Campaign', 'LostAll', FLostAll);
   Ini.WriteBool('Campaign', 'PremiseSeen', FPremiseSeen);
   Ini.WriteBool('Campaign', 'KillPending', FKillPending);
   Ini.WriteInteger('Campaign', 'CrossGame', FCrossGame);
@@ -203,6 +218,7 @@ begin
   EndEasedHand;
   Inc(FLostHands);
   Inc(FTotalLost);
+  Inc(FLostAll);
   Save;
 end;
 

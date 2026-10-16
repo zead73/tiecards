@@ -6,7 +6,7 @@ program TestController;
 {$mode objfpc}{$H+}
 
 uses SysUtils, Types, Classes, Cards, TriPeaks, Inventory, Session, Stage, Story, Vampires, Specials,
-  Campaign, Duel, DuelSession, DuelInfo, Settings, HandFile, CampaignSlots, Storage, Records, GameController
+  Campaign, Duel, DuelSession, DuelInfo, Settings, HandFile, CampaignSlots, Storage, Records, Trophies, GameController
   {$IFDEF PAS2JS}, JsCompat{$ENDIF};
 
 var
@@ -103,6 +103,8 @@ begin
   StoreDelete(DefaultInventoryFile);
   StoreDelete(DefaultCampaignFile);
   StoreDelete(DefaultSettingsFile);
+  StoreDelete(DefaultTrophiesFile);
+  StoreDelete(DefaultRecordsFile);
   StoreDelete(AutoSaveFile(gmFreePlay));
   StoreDelete(AutoSaveFile(gmCampaign));
   for N := 1 to SlotCount do StoreDelete(SlotFile(N));
@@ -1551,6 +1553,160 @@ begin
   end;
 end;
 
+{ Trophies: earned by playing, shown on the shelf in the panel, a page when tapped. }
+procedure TestTrophies;
+var
+  St: TStory;
+  C: TGameController;
+  D: TDecks;
+  W: TWatcher;
+  L: TTrophyLayout;
+  I: Integer;
+  Name1: string;
+begin
+  WipeStore;
+  St := TStory.Create;
+  St.LoadFromFile(StoryPath);
+  D := TDecks.Create;
+  W := TWatcher.Create;
+  C := NewCtl(St, D, W);
+  try
+    C.Start;
+    RunOut(C);
+    Check(C.Trophies.Count = 0, 'a new player has no trophies');
+    L := C.TrophyLayout;
+    Check(not L.Chip and (L.Shelf.Right > L.Shelf.Left), 'the shelf is in the side panel');
+    Check(Inside(L.Slots[0], C.PanelRect) and Inside(L.Slots[5], C.PanelRect), 'its slots are inside the panel');
+    Check(C.TrophyArt(0) = ArtTrophyEmpty, 'an empty tile for a trophy not earned');
+
+    { a perfect Free Play win earns the first two }
+    ClearBoard(C);
+    Check(C.Game.IsWon, 'test set-up: a won hand');
+    Check(C.Trophies.Has(trFirstWin) and C.Trophies.Has(trPerfect), 'the first win and the perfect hand');
+    Check(not C.Trophies.Has(trVampire0), 'but not the first vampire''s');
+    Name1 := St.TrophyName('firstwin');
+    Check(Pos('Trophy earned: ' + Name1, C.GetUi.StatusText) > 0, 'the status line says so: ' + C.GetUi.StatusText);
+    Check(C.TrophyArt(0) = ArtTrophy0, 'its picture is drawn now');
+
+    { tapping the shelf (even on the win screen) opens the trophy page }
+    L := C.TrophyLayout;
+    C.Tap((L.Shelf.Left + L.Shelf.Right) div 2, (L.Shelf.Top + L.Shelf.Bottom) div 2);
+    Check(C.Overlay = okTrophies, 'the shelf opens the trophy page');
+    Check(C.Game.IsWon, 'and does not deal a new hand');
+    Check(C.OverlayRowCount = TrophyCount, 'one row for each trophy');
+    Check((C.OverlayRow(0).Title = Name1) and (C.OverlayRow(0).Art = ArtTrophy0)
+      and (C.OverlayRow(0).Detail = St.TrophyLine('firstwin')), 'an earned one: its name, its picture and its words');
+    Check((C.OverlayRow(2).Detail = St.TrophyHow('jack')) and (C.OverlayRow(2).Aside = '')
+      and (C.OverlayRow(2).Art = ArtTrophyEmpty), 'one not earned: how to get it, an empty tile');
+    Check(C.OverlayFooter = '2 of 6 earned', 'the count: ' + C.OverlayFooter);
+    for I := 0 to C.OverlayRowCount - 1 do
+      Check(C.OverlayRow(I).ButtonText = '', 'row ' + IntToStr(I) + ' has no button');
+    C.ActionCloseOverlay;
+    Check(C.Overlay = okNone, 'closed');
+    C.Tap(5, 5);
+    RunOut(C);
+    Check(not C.Game.IsWon, 'a tap elsewhere on the win screen still deals again');
+    TapCard(C, 27);
+    Check(Pos('Trophy earned', C.GetUi.StatusText) = 0, 'the news goes with the next tap on the table');
+    C.ActionNew;
+    RunOut(C);
+
+    { a win with a missed move is not perfect, so a fresh player earns only the first win }
+    C.ActionEraseEverything;
+    RunOut(C);
+    Check(C.Trophies.Count = 0, 'Erase everything clears the trophies');
+  finally
+    C.Free;
+  end;
+  { they survive a restart of the program }
+  WipeStore;
+  C := NewCtl(St, D, W);
+  try
+    C.Start;
+    RunOut(C);
+    ClearBoard(C);
+    Check(C.Trophies.Count = 2, 'earned again');
+  finally
+    C.Free;
+  end;
+  C := NewCtl(St, D, W);
+  try
+    C.Start;
+    RunOut(C);
+    Check(C.Trophies.Has(trFirstWin) and C.Trophies.Has(trPerfect) and (C.Trophies.Count = 2), 'saved on disk');
+  finally
+    C.Free; W.Free; D.Free; St.Free;
+  end;
+end;
+
+{ The campaign trophies: a vampire for each kill, and the flawless one. }
+procedure TestCampaignTrophies;
+var
+  St: TStory;
+  C: TGameController;
+  D: TDecks;
+  W: TWatcher;
+  V, I: Integer;
+
+  procedure Beat(AVampire: Integer);
+  var
+    N: Integer;
+  begin
+    for N := 1 to WinsToKill do
+    begin
+      if AVampire = 2 then                       { the rigged deal runs from the 7 down through the Ace to the King }
+      begin
+        C.Session.Inventory.AddSpecial(skOpenWrap, 1);   { so the King, who has no wrap, needs this }
+        C.Duel.UseSpecial(skOpenWrap);
+      end;
+      ClearBoard(C);
+      ClickThrough(C);
+      RunOut(C);
+    end;
+  end;
+
+begin
+  WipeStore;
+  St := TStory.Create;
+  St.LoadFromFile(StoryPath);
+  D := TDecks.Create;
+  W := TWatcher.Create;
+  C := NewCtl(St, D, W);
+  try
+    C.Start;
+    RunOut(C);
+    C.ActionToggleMode;
+    ClickThrough(C);
+    RunOut(C);
+    C.ActionNew;                                 { one lost hand against the first vampire }
+    ClickThrough(C);
+    RunOut(C);
+    Check(C.Duel.Campaign.LostAll = 1, 'one lost hand counted');
+    Beat(0);
+    Check(C.Trophies.Has(trVampire0) and not C.Trophies.Has(trVampire1), 'the first vampire''s trophy for the first kill');
+    Check(C.Trophies.Has(trFirstWin) and C.Trophies.Has(trPerfect), 'with the first win and a perfect hand on the way');
+    Beat(1);
+    Beat(2);
+    Check(C.Trophies.Has(trVampire1) and C.Trophies.Has(trVampire2), 'all three vampires');
+    Check(not C.Trophies.Has(trFlawless), 'but a lost hand rules out the flawless one');
+    Check(C.Trophies.Count = 5, 'five of six');
+
+    { starting the campaign again keeps them, and a clean run earns the last one }
+    C.ActionRestartCampaign;
+    ClickThrough(C);
+    RunOut(C);
+    Check(C.Trophies.Count = 5, 'Restart campaign keeps the trophies');
+    Check(C.Duel.Campaign.LostAll = 0, 'and the lost-hand count starts again');
+    Beat(0);
+    Beat(1);
+    Beat(2);
+    Check(C.Trophies.Has(trFlawless), 'a whole campaign without losing a hand: the flawless trophy');
+    Check(Pos(St.TrophyName('flawless'), C.GetUi.StatusText) > 0, 'announced: ' + C.GetUi.StatusText);
+  finally
+    C.Free; W.Free; D.Free; St.Free;
+  end;
+end;
+
 procedure TestPrices;
 var
   St: TStory;
@@ -1613,6 +1769,8 @@ begin
   TestSaveSlots;
   TestTrickControls;
   TestCrossControls;
+  TestTrophies;
+  TestCampaignTrophies;
   TestBiteStatus;
   TestPrices;
   WipeStore;

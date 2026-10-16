@@ -10,7 +10,7 @@ interface
 
 uses
   Classes, SysUtils, Types, Math, Graphics, IntfGraphics, GraphType, FPImage,
-  Stage, Vampires, CardImages;
+  Stage, Vampires, CardImages, Trophies;
 
 const
   PortraitLevels = 12;               { brightness steps for fading a portrait }
@@ -31,6 +31,9 @@ type
     FHouseW, FHouseH: Integer;
     FPanelHouse: TBitmap;            { the house cropped to fit the Free Play panel }
     FPanelHouseW, FPanelHouseH: Integer;
+    FTrophyMasters: array[0..TrophyCount - 1] of TFPMemoryImage;
+    FTrophyBmps: array[0..TrophyCount - 1] of TBitmap;     { at FTrophyH }
+    FTrophyH: Integer;
     function Portrait(V, W, H: Integer; Brightness: Double): TBitmap;
     procedure DrawTextBox(C: TCanvas; const R: TRect; St: TStage; K: Double);
   public
@@ -45,6 +48,9 @@ type
     procedure DrawHousePicture(C: TCanvas; const R: TRect; Dark: Double);
     { The house, the middle of the picture, framed to fill R (the Free Play panel). }
     procedure DrawHouseFramed(C: TCanvas; const R: TRect);
+    { Trophy I as a small card picture, as tall as R and centred in it; a trophy
+      not earned yet is an empty outlined tile of the same shape. }
+    procedure DrawTrophy(C: TCanvas; I: Integer; const R: TRect; Earned: Boolean);
     { A vampire's portrait scaled to fill R (Brightness 1 = fully lit). }
     procedure DrawPortraitIn(C: TCanvas; V: Integer; const R: TRect;
       Brightness: Double);
@@ -68,6 +74,11 @@ begin
   FHouseMaster.Free;
   FHouse.Free;
   FPanelHouse.Free;
+  for L := 0 to TrophyCount - 1 do
+  begin
+    FTrophyMasters[L].Free;
+    FTrophyBmps[L].Free;
+  end;
   inherited Destroy;
 end;
 
@@ -314,6 +325,51 @@ begin
   SY := (CH - H) div 2;
   C.CopyRect(R, FHouse.Canvas, Rect(SX, SY, SX + W, SY + H));
   DrawOverlay(C, R, RGBToColor(4, 4, 10), Dark);
+end;
+
+procedure TSceneView.DrawTrophy(C: TCanvas; I: Integer; const R: TRect; Earned: Boolean);
+var
+  H, W, X, J: Integer;
+  Img: TFPMemoryImage;
+begin
+  H := R.Bottom - R.Top;
+  if (H < 6) or (I < 0) or (I >= TrophyCount) then Exit;
+  W := Round(H * 164 / 232);
+  X := R.Left + ((R.Right - R.Left) - W) div 2;
+  if Earned then
+  begin
+    if FTrophyH <> H then
+    begin
+      for J := 0 to TrophyCount - 1 do
+      begin
+        FTrophyBmps[J].Free;
+        FTrophyBmps[J] := nil;
+      end;
+      FTrophyH := H;
+    end;
+    if FTrophyBmps[I] = nil then
+    begin
+      if FTrophyMasters[I] = nil then
+        FTrophyMasters[I] := LoadResourceImage('special_trophy_' + TrophyKeys[TTrophy(I)]);
+      Img := ScaleToImage(FTrophyMasters[I], W, H);
+      try
+        FTrophyBmps[I] := ImageToBitmap(Img, 1);
+      finally
+        Img.Free;
+      end;
+    end;
+    C.Draw(X, R.Top, FTrophyBmps[I]);
+  end
+  else
+  begin
+    C.Brush.Style := bsSolid;
+    C.Brush.Color := RGBToColor(30, 19, 38);
+    C.Pen.Style := psSolid;
+    C.Pen.Width := 1;
+    C.Pen.Color := RGBToColor(110, 90, 46);
+    C.RoundRect(X, R.Top, X + W, R.Top + H, Max(3, H div 8), Max(3, H div 8));
+    C.Brush.Style := bsClear;
+  end;
 end;
 
 procedure TSceneView.DrawHouseFramed(C: TCanvas; const R: TRect);

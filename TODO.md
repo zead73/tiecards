@@ -126,6 +126,26 @@ Ideas to review later.
       `web/README.md` (2026-10-16).
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
+## Trophies (2026-10-16)
+
+- [x] **Trophies, built from the user's design.** Six, all deterministic: first win, perfect
+      hand (no missed moves), one per vampire killed, and flawless (the whole campaign
+      with no lost hand). They show on a shelf at the foot of the side panel (a small
+      picture each, an empty tile for the rest); tapping the shelf opens the trophy page
+      (`okTrophies`). In a phone-width strip the shelf is one "Trophies n/6" chip under the
+      portrait. They survive Restart campaign; Erase everything clears them. Code:
+      `src/trophies.pas` (earned set in `trophies.ini`, and the shelf geometry shared by the
+      controller and both front ends), `Campaign.LostAll` (a campaign-wide lost-hand
+      count, saved in slots), awards in `TGameController.EarnTrophy`, the news line
+      "Trophy earned: ..." stays until the next tap on the table. First run with no
+      trophies file: players are given what their records already prove (wins, perfect
+      hands, kills); flawless never comes from history, and a campaign file with no
+      `LostAll` counts as not flawless. Names and words: `[trophies]` in `story.ini`
+      (the user will adjust them). Pictures: `tools/make_trophies.py` writes
+      `assets/specials/special_trophy_*.png` (not in make-art.sh). Tests: `tests/testtrophies.pas`
+      plus controller and start-over tests. Possible later: milestone trophies, a longer
+      line on narrow screens (the page clips long text on a phone).
+
 ## Linux icon (2026-10-16)
 
 - [x] The Linux window now sets its own icon (the .ico is embedded as `TIECARDS_ICO`,

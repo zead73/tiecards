@@ -11,7 +11,7 @@ uses
 {$IFNDEF PAS2JS}
   Classes,
 {$ENDIF}
-  SysUtils, TextIni, Storage, Vampires, Specials;
+  SysUtils, TextIni, Storage, Vampires, Specials, Trophies;
 
 type
   TStringArray = array of string;
@@ -70,6 +70,11 @@ type
     function FenwickPitch(const Key: string): string;
 
     { Lists every required entry that is missing or empty (empty = all good). }
+    { A trophy's name, how it is earned, and what it says once you have it. Key is
+      one of TrophyKeys. }
+    function TrophyName(const Key: string): string;
+    function TrophyHow(const Key: string): string;
+    function TrophyLine(const Key: string): string;
     function Validate: TStringArray;
   end;
 
@@ -285,10 +290,26 @@ begin
   Result := Value('fenwick', 'pitch.' + Key);
 end;
 
+function TStory.TrophyName(const Key: string): string;
+begin
+  Result := Value('trophies', Key + '.name');
+end;
+
+function TStory.TrophyHow(const Key: string): string;
+begin
+  Result := Value('trophies', Key + '.how');
+end;
+
+function TStory.TrophyLine(const Key: string): string;
+begin
+  Result := Value('trophies', Key + '.line');
+end;
+
 function TStory.Validate: TStringArray;
 var
   V, T: Integer;
   K: TSpecialKind;
+  TR: TTrophy;
 
   procedure Need(const Section, Key: string);
   begin
@@ -333,6 +354,12 @@ begin
   Need('fenwick', 'pitch.hint');
   Need('finale', 'finale.1');
   Need('finale', 'caption');
+  for TR := Low(TTrophy) to High(TTrophy) do
+  begin
+    Need('trophies', TrophyKeys[TR] + '.name');
+    Need('trophies', TrophyKeys[TR] + '.how');
+    Need('trophies', TrophyKeys[TR] + '.line');
+  end;
 end;
 
 end.

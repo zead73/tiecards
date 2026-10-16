@@ -5,9 +5,9 @@ unit StartOver;
 
     EraseEverything     a brand-new player: coins, undo and hint cards, which
                         hands have paid, campaign progress, the mode, and every
-                        saved hand and slot (the campaign's too), and the personal records.
+                        saved hand and slot (the campaign's too), the personal records and the trophies.
     RestartCampaignOnly the story starts again from the first vampire; your
-                        coins and cards (and Free Play hands) are kept.
+                        coins and cards (and Free Play hands) and your trophies are kept.
 
   Only the game's own save data is touched. }
 
@@ -16,19 +16,19 @@ unit StartOver;
 interface
 
 uses
-  SysUtils, Inventory, Session, Campaign, Settings, HandFile, Records;
+  SysUtils, Inventory, Session, Campaign, Settings, HandFile, Records, Trophies;
 
 { SaveDir is the folder holding the saved hands. The caller must start a new
   hand afterwards (the one in memory is not touched). }
 procedure EraseEverything(ASession: TGameSession; ACampaign: TCampaign;
-  ASettings: TSettings; ARecords: TRecords; const SaveDir: string);
+  ASettings: TSettings; ARecords: TRecords; ATrophies: TTrophies; const SaveDir: string);
 
 procedure RestartCampaignOnly(ACampaign: TCampaign; const SaveDir: string);
 
 implementation
 
 procedure EraseEverything(ASession: TGameSession; ACampaign: TCampaign;
-  ASettings: TSettings; ARecords: TRecords; const SaveDir: string);
+  ASettings: TSettings; ARecords: TRecords; ATrophies: TTrophies; const SaveDir: string);
 begin
   ASession.Inventory.Reset;              { 50 coins, no cards, no paid hands }
   ASession.SaveNow;
@@ -39,6 +39,7 @@ begin
   ASettings.StockUnlocked := False;
   ASettings.Save;
   ARecords.Reset;                        { personal records too }
+  ATrophies.Reset;                       { and the trophies (Restart campaign keeps them) }
   DeleteAllSavedHands(SaveDir);
 end;
 

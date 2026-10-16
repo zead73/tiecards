@@ -44,6 +44,8 @@ type
     Remaining, Stock, Streak, BestStreak, Coins: Integer;
     FreePlay: Boolean;
     PerWin, Misses, MissCut, PayNow: Integer;
+    Trophies: Integer;        { bit I set = trophy I is earned (the shelf in the panel) }
+    TrophyCount: Integer;     { how many are earned }
   end;
 
 function GetDuelInfo(ADuel: TDuelSession; AStory: TStory): TDuelInfo;

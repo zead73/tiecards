@@ -29,6 +29,11 @@ ring marks the silver cross that a Wild card can claim:
 
 ![The same hand with every card revealed and the silver cross showing](docs/screenshots/silver-cross.png)
 
+The shelf at the foot of the panel holds the trophies you have earned (six in
+all, and nothing about them is random). Tapping it opens the trophy page:
+
+![The trophy page, three earned and three still to win](docs/screenshots/trophies.png)
+
 Fenwick Grimm's Store, where everything has a fixed price:
 
 ![Fenwick Grimm's Store](docs/screenshots/store.png)
@@ -53,6 +58,9 @@ Things worth knowing before you read the code:
 - There is nothing random in rewards or purchases. Prices are fixed, rewards are
   fixed, and no coin buys a chance at anything. This is a deliberate rule for the
   project.
+- You collect trophies for your first win, a perfect hand, each vampire killed, and
+  a whole Campaign without losing a hand. They sit on a shelf in the side panel and
+  survive restarting the Campaign.
 - Progress is saved automatically (the hand after every move, coins and cards as
   they change). The Menu also has manual save slots for both modes.
 

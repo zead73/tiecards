@@ -18,8 +18,8 @@ type
     FPortrait: TBitmap;
     FPW, FPH: Integer;
     FPortraitMaster: TFPMemoryImage;
-    FMasters: array[0..StoreGoodCount - 1] of TFPMemoryImage;
-    FIcons: array[0..StoreGoodCount - 1] of TBitmap;
+    FMasters: array[0..OverlayArtCount - 1] of TFPMemoryImage;
+    FIcons: array[0..OverlayArtCount - 1] of TBitmap;
     FIconSize: Integer;
     function Icon(Art, Size: Integer): TBitmap;
     function PortraitBmp(W, H: Integer): TBitmap;
@@ -34,8 +34,9 @@ implementation
 
 const
   FontName = 'Times New Roman';
-  ArtKey: array[0..StoreGoodCount - 1] of string =
-    ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint');
+  ArtKey: array[0..OverlayArtCount - 1] of string =
+    ('fulldeck', 'openwrap', 'dawn', 'wild', 'seer', 'stake', 'undo', 'hint',
+     'trophy_firstwin', 'trophy_perfect', 'trophy_jack', 'trophy_queen', 'trophy_king', 'trophy_flawless');
 
 function Gold: TColor;
 begin
@@ -58,7 +59,7 @@ var
 begin
   FPortrait.Free;
   FPortraitMaster.Free;
-  for I := 0 to StoreGoodCount - 1 do
+  for I := 0 to OverlayArtCount - 1 do
   begin
     FMasters[I].Free;
     FIcons[I].Free;
@@ -85,7 +86,7 @@ var
 begin
   if FIconSize <> Size then
   begin
-    for I := 0 to StoreGoodCount - 1 do
+    for I := 0 to OverlayArtCount - 1 do
     begin
       FIcons[I].Free;
       FIcons[I] := nil;
@@ -224,10 +225,27 @@ begin
     begin
       IconH := RowH - 8;
       IconR := Rect(R.Left + 6, R.Top + 4, R.Left + 6 + Round(IconH * 164 / 232), R.Top + 4 + IconH);
-      C.Draw(IconR.Left, IconR.Top, Icon(Row.Art, IconH));
+      if Row.Art = ArtTrophyEmpty then
+      begin
+        { a trophy not earned yet: an empty tile, the same shape as the pictures }
+        C.Brush.Style := bsSolid;
+        C.Brush.Color := RGBToColor(22, 13, 28);
+        C.Pen.Color := RGBToColor(110, 90, 46);
+        C.RoundRect(IconR.Left, IconR.Top, IconR.Right, IconR.Bottom, Max(4, IconH div 8), Max(4, IconH div 8));
+        C.Brush.Style := bsClear;
+        C.Font.Size := Max(8, IconH div 2);
+        C.Font.Style := [fsBold];
+        C.Font.Color := RGBToColor(110, 90, 46);
+        C.TextOut(IconR.Left + ((IconR.Right - IconR.Left) - C.TextWidth('?')) div 2,
+          IconR.Top + (IconH - C.TextHeight('?')) div 2, '?');
+      end
+      else
+        C.Draw(IconR.Left, IconR.Top, Icon(Row.Art, IconH));
       X := IconR.Right + Round(10 * K);
     end;
-    if Row.ButtonText <> '' then TW := B.Left - 70 else TW := R.Right - 150;
+    if Row.ButtonText <> '' then TW := B.Left - 70
+    else if Row.Aside = '' then TW := R.Right - 12
+    else TW := R.Right - 150;
     C.Font.Style := [fsBold];
     C.Font.Color := Bone;
     if RowH >= 28 then
