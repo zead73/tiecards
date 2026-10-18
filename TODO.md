@@ -116,7 +116,7 @@ Ideas to review later.
       scenes, panel, save slots, Start over, reload-and-resume, no console errors.
       See `web/README.md`. Needs pas2js 3.x (now unpacked in
       `~/.local/share/tiecards-pas2js/`, the default path; set `PAS2JS_DIR` to use another).
-- [ ] **Not yet tried on a real tablet or phone.** Things to look at: touch
+- [ ] **REMIND THE USER: not yet tried on a real tablet or phone** (also the relics in real play). Things to look at: touch
       feel, the sound (it cannot be heard from here), the text sizes, the
       phone-sized panel strip (a little cramped under about 500 px wide).
 - [x] **Offline play** done (service worker, 2026-10-10); needs https.
@@ -364,14 +364,9 @@ Ideas to review later.
 
 ## Loose ends I know about
 
-- [ ] Balance numbers are placeholders: coin rewards (20 / 30 / 40 per win in the campaign,
-      25 in Free Play), the 2-coin step per lost hand, the 5-coin floor, the 4-coin bite,
-      the Store percentages (50 / 60 / 75) and the pack prices and sizes. The numbers
-      live in `src/inventory.pas`, `src/vampires.pas` and `src/specials.pas`; the
-      player's Rules text (`src/rules.pas`) reads them, so it follows any change.
-      (The 2-coin missed-move penalty and its sting sound are approved for now.)
-      2026-10-16: the user has been playing and is happy so far; KEEP OPEN until
-      Andrea's feedback arrives.
+- [x] Balance (2026-10-18): the user says it is fine: both of them win less often than they lose,
+      which is the intent. The numbers live in `src/inventory.pas`, `src/vampires.pas`,
+      `src/specials.pas`, `src/cosmetics.pas` and `src/relics.pas`; the Rules text reads them.
 - [x] Duel sounds listened to on Linux and Windows: the user says they all sound perfect
       (2026-10-16). (The deal flicks can trail the cards a little on Linux because the
       sound player takes a moment to start.)
