@@ -87,3 +87,23 @@ HOUSE RCDATA "../assets/house/house.png"
 STORY RCDATA "../assets/story/story.ini"
 MAINICON ICON "../assets/icon/tiecards.ico"
 TIECARDS_ICO RCDATA "../assets/icon/tiecards.ico"
+1 VERSIONINFO
+FILEVERSION 0,9,1,0
+PRODUCTVERSION 0,9,1,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904E4"
+    BEGIN
+      VALUE "FileDescription", "Tiecards, a gothic Tri Peaks solitaire"
+      VALUE "FileVersion", "0.9.1"
+      VALUE "ProductName", "Tiecards"
+      VALUE "ProductVersion", "0.9.1"
+      VALUE "LegalCopyright", "MIT licence"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1252
+  END
+END

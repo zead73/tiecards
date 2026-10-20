@@ -18,13 +18,14 @@ type
     Game: THandData;
     Misses: Integer;
     Bites: Integer;               { bitten cards played (Lucien's trick) }
-    Relics: Integer;              { the relics the hand was dealt with (bits: see Relics) }
+    ForgivenBite: Integer;        { which bite the Garlic Wreath forgave (1 = the first of the hand), 0 = none yet }
+    ForgivenMiss: Integer;        { which missed move the Steady Locket forgave, 0 = none yet }
     FreeHintUsed: Boolean;        { the Moonstone's free Show move was already used }
   end;
 
   { A Free Play hand was won (and paid): its longest streak and missed moves. }
   TWonEvent = procedure(BestStreak, Misses: Integer) of object;
-  { Asked at every deal: the relics to play the new hand with (bits, see Relics). }
+  { Asked whenever the relics in use are needed: what is equipped now (bits, see Relics). }
   TRelicsEvent = function: Integer of object;
 
   THintResult = (
@@ -50,19 +51,21 @@ type
     FMissedLast: Boolean;        { the last draw was a missed move }
     FTouched: Boolean;           { a card has been played or drawn in this hand }
     FRelicProvider: TRelicsEvent;
-    FRelics: Integer;            { the relics equipped: they apply to the next hand dealt }
-    FActiveRelics: Integer;      { the relics the hand on the table was dealt with }
+    FRelics: Integer;            { the relics equipped (used when there is no provider) }
+    FForgivenBite: Integer;      { the bite the Garlic Wreath forgave: the first taken while it was equipped }
+    FForgivenMiss: Integer;      { the missed move the Steady Locket forgave }
     FFreeHintUsed: Boolean;
     FCrossClaimed: Boolean;      { a Wild card just took the silver cross: the duel has to hear of it }
     FRestored: Boolean;          { a saved hand was just put back and nothing has been done since }
     FOver: Boolean;              { the hand is finished (lost or given up) }
     FNote: string;
     FOnWon: TWonEvent;
+    function GetRelics: Integer;
     function RawCanUndo: Boolean;
     function SpecialRescue: Boolean;
     procedure AfterSpecial;
     procedure CheckStuck;
-    procedure ApplyRelics;
+    procedure SyncRelics;
     procedure Save;
     procedure CheckWin;
   public
@@ -79,13 +82,15 @@ type
       just dealt. A Wild card played on it claims it; any other play (or a Wood
       Stake) destroys it. }
     { ---- relics (see Relics) ---- }
-    procedure SetRelics(AMask: Integer);       { equip: a hand not yet started takes them at once }
-    property Relics: Integer read FRelics write SetRelics;
+    { Relics work the moment they are equipped, in the hand on the table too. What a
+      hand has already used (the Pick's break, the Moonstone's hint, the bite and the
+      miss that were forgiven) stays used however the relics are changed. }
+    procedure SetRelics(AMask: Integer);       { equip or remove: tell the game }
+    property Relics: Integer read GetRelics write SetRelics;
     property RelicProvider: TRelicsEvent read FRelicProvider write FRelicProvider;
-    property ActiveRelics: Integer read FActiveRelics;
     { Missed moves and bitten cards as they are charged: the Steady Locket and the
-      Garlic Wreath forgive the first of each. The raw counts (Misses, Bites) are what
-      Records and the panel show. }
+      Garlic Wreath forgive the first of each that happens while they are equipped. The
+      raw counts (Misses, Bites) are what Records and the panel show. }
     function ChargedMisses: Integer;
     function ChargedBites: Integer;
     function FreeHintAvailable: Boolean;       { the Moonstone's free Show move is still to come }
@@ -128,6 +133,7 @@ type
     function CanShop: Boolean;
     { The hand is finished, whatever the reason (the duel gave it up). }
     procedure EndHand;
+    property HandOver: Boolean read FOver;
     { True if a playable card should be drawn highlighted. }
     function IsHinted(I: Integer): Boolean;
 
@@ -198,40 +204,46 @@ begin
   FHazard := AHazard;
 end;
 
+{ What is equipped now. }
+function TGameSession.GetRelics: Integer;
+begin
+  if Assigned(FRelicProvider) then FRelics := FRelicProvider();
+  if not ValidRelicMask(FRelics) then FRelics := 0;
+  Result := FRelics;
+end;
+
 procedure TGameSession.SetRelics(AMask: Integer);
 begin
   if not ValidRelicMask(AMask) then AMask := 0;
   FRelics := AMask;
-  { the Store's rule: before the first move the hand on the table takes them too }
-  if not FTouched and not FOver and not FGame.IsWon then
-  begin
-    FActiveRelics := FRelics;
-    ApplyRelics;
-  end;
+  SyncRelics;
+  if not FOver and not FGame.IsWon then CheckStuck;   { taking the Pick out can leave the hand with no move }
 end;
 
-{ Put the hand's relics into effect: the Spoon and the Pick change the game's rules. }
-procedure TGameSession.ApplyRelics;
+{ Put the equipped relics into effect: the Spoon and the Pick change the game's rules. }
+procedure TGameSession.SyncRelics;
+var
+  R: Integer;
 begin
-  FGame.SetRelicRules(HasRelic(FActiveRelics, rlSpoon), Ord(HasRelic(FActiveRelics, rlPick)));
-  FFreeHintUsed := False;
+  R := GetRelics;
+  FGame.SetRelicRules(HasRelic(R, rlSpoon), HasRelic(R, rlPick));
 end;
 
 function TGameSession.ChargedMisses: Integer;
 begin
   Result := FMisses;
-  if HasRelic(FActiveRelics, rlLocket) and (Result > 0) then Dec(Result);
+  if (FForgivenMiss > 0) and (FForgivenMiss <= FMisses) then Dec(Result);
 end;
 
 function TGameSession.ChargedBites: Integer;
 begin
   Result := FBites;
-  if HasRelic(FActiveRelics, rlGarlic) and (Result > 0) then Dec(Result);
+  if (FForgivenBite > 0) and (FForgivenBite <= FBites) then Dec(Result);
 end;
 
 function TGameSession.FreeHintAvailable: Boolean;
 begin
-  Result := HasRelic(FActiveRelics, rlMoonstone) and not FFreeHintUsed and not FGame.IsWon;
+  Result := HasRelic(GetRelics, rlMoonstone) and not FFreeHintUsed and not FGame.IsWon;
 end;
 
 function TGameSession.PlaceCross: Boolean;
@@ -268,9 +280,10 @@ begin
   FGame.WrapRanks := FWrapRanks;
   FGame.Deal(ADeck, FStockSize);
   if FHazardsOn then FGame.SetHazard(FHazard);
-  if Assigned(FRelicProvider) then FRelics := FRelicProvider();
-  FActiveRelics := FRelics;                   { the hand keeps the relics it was dealt with }
-  ApplyRelics;
+  SyncRelics;
+  FFreeHintUsed := False;
+  FForgivenBite := 0;
+  FForgivenMiss := 0;
   FMisses := 0;
   FBites := 0;
   FCrossClaimed := False;
@@ -311,20 +324,23 @@ begin
   FGame.GetState(H.Game);
   H.Misses := FMisses;
   H.Bites := FBites;
-  H.Relics := FActiveRelics;
+  H.ForgivenBite := FForgivenBite;
+  H.ForgivenMiss := FForgivenMiss;
   H.FreeHintUsed := FFreeHintUsed;
 end;
 
 function TGameSession.ImportHand(const H: TSavedHand): Boolean;
 begin
-  Result := (H.Misses >= 0) and (H.Bites >= 0) and ValidRelicMask(H.Relics)
-    and (H.Game.FeedOnce = HasRelic(H.Relics, rlSpoon))               { the game's rules agree with its relics }
-    and ((H.Game.BreakStart = 1) = HasRelic(H.Relics, rlPick))
+  Result := (H.Misses >= 0) and (H.Bites >= 0)
+    and (H.ForgivenBite >= 0) and (H.ForgivenBite <= H.Bites)
+    and (H.ForgivenMiss >= 0) and (H.ForgivenMiss <= H.Misses)
     and FGame.SetState(H.Game);
   if not Result then Exit;
   FMisses := H.Misses;
   FBites := H.Bites;
-  FActiveRelics := H.Relics;
+  FForgivenBite := H.ForgivenBite;
+  FForgivenMiss := H.ForgivenMiss;
+  SyncRelics;                                 { the relics equipped now, not the ones it was saved with }
   FFreeHintUsed := H.FreeHintUsed;
   FMissedLast := False;
   FHintActive := False;
@@ -349,7 +365,11 @@ begin
   Cross := FGame.Mark(I) = MarkCross;
   Result := FGame.PlayTableau(I);
   if not Result then Exit;
-  if Bite then Inc(FBites);               { the bite takes coins off this hand's reward }
+  if Bite then
+  begin
+    Inc(FBites);                          { the bite takes coins off this hand's reward }
+    if (FForgivenBite = 0) and HasRelic(GetRelics, rlGarlic) then FForgivenBite := FBites;
+  end;
   FMissedLast := False;
   FHintActive := False;
   FTouched := True;
@@ -369,7 +389,11 @@ begin
   Result := FGame.DrawStock;
   if not Result then Exit;
   FMissedLast := Missed;
-  if Missed then Inc(FMisses);
+  if Missed then
+  begin
+    Inc(FMisses);
+    if (FForgivenMiss = 0) and HasRelic(GetRelics, rlLocket) then FForgivenMiss := FMisses;
+  end;
   FHintActive := False;
   FTouched := True;
   FRestored := False;
@@ -521,8 +545,16 @@ begin
   Missed := FGame.LastMoveMissed;
   Bitten := FGame.LastMoveBitten;
   FGame.Undo;
-  if Missed and (FMisses > 0) then Dec(FMisses);   { the miss is taken back }
-  if Bitten and (FBites > 0) then Dec(FBites);     { and so is the bite }
+  if Missed and (FMisses > 0) then               { the miss is taken back, and its forgiveness with it }
+  begin
+    if FMisses = FForgivenMiss then FForgivenMiss := 0;
+    Dec(FMisses);
+  end;
+  if Bitten and (FBites > 0) then                { and so is the bite }
+  begin
+    if FBites = FForgivenBite then FForgivenBite := 0;
+    Dec(FBites);
+  end;
   FMissedLast := False;
   FHintActive := False;
   FNote := '';

@@ -7,6 +7,7 @@
 # upgraded, delete that folder and run this script again to refresh the copy.
 set -e
 cd "$(dirname "$0")"
+tools/check-version.sh
 ./make-resources.sh
 T="$HOME/.local/share/tiecards-cross"
 mkdir -p "$T/config"

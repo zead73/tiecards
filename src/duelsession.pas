@@ -68,6 +68,9 @@ type
       lost by them just as by a card tap. }
     function UseSpecial(K: TSpecialKind): Boolean;
     function UseSpecialOn(K: TSpecialKind; I: Integer): Boolean;
+    { The equipped relics changed in the middle of the hand: taking the Pick out can leave
+      a hand with no move, which loses it just as a played card would. }
+    procedure RelicsChanged;
     { The player gave up this hand (New Game during a duel). }
     function Concede: Boolean;
     { Stuck, but an undo card or a special card could still save the hand: the
@@ -218,6 +221,11 @@ function TDuelSession.UseHint: THintResult;
 begin
   if FDuel.State <> dsPlaying then Result := hrNoMoves
   else Result := FSession.UseHint;
+end;
+
+procedure TDuelSession.RelicsChanged;
+begin
+  Evaluate;
 end;
 
 function TDuelSession.Concede: Boolean;

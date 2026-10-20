@@ -580,24 +580,40 @@ begin
     ClearMarks(G);
     G.SetMark(25, MarkChained);
     Check(G.IsLocked(25) and not G.CanPlay(25), 'no Pick: the chained card is locked while its neighbour is there');
-    G.SetRelicRules(False, 1);
-    Check(G.BreaksLeft = 1, 'the Pick gives one break');
+    G.SetRelicRules(False, True);
+    Check(G.BreakAvailable, 'the Pick gives one break');
     Check(G.IsLockedStrict(25) and not G.IsLocked(25), 'with the Pick the card is let through (the plain rule still says locked)');
     Check(G.CanPlay(25), 'and it can be played');
     Check(G.HasMoves, 'a break counts as a move (a hand is not stuck while one could save it)');
     G.GetState(Start);
     Check(G.PlayTableau(25), 'play it');
-    Check(G.BreaksLeft = 0, 'the break is spent');
+    Check(not G.BreakAvailable and G.BreakUsed, 'the break is spent');
     G.GetState(A);
     Check(A.History[High(A.History)].Broke, 'the move remembers it broke a chain');
     G.SetMark(23, MarkChained);                       { another chained card, its neighbours still there }
     Check(G.IsLocked(23), 'a second chained card is locked: one break a hand');
     Check(G.Undo, 'undo the play');
-    Check(G.BreaksLeft = 1, 'and the break is given back');
+    Check(G.BreakAvailable, 'and the break is given back');
     G.SetMark(23, MarkNone);                          { the test's own extra chain comes off }
     G.GetState(B);
-    Check((B.Plays = 0) and (B.WasteCount = 1) and not B.Removed[25] and (B.BreakLeft = 1) and (Length(B.History) = 0),
+    Check((B.Plays = 0) and (B.WasteCount = 1) and not B.Removed[25] and not B.BreakUsed and (Length(B.History) = 0),
       'back at the start: the card is back, the break unspent, nothing to undo');
+    { the Pick is taken out in the middle of a hand, and put back: still one break }
+    G.SetRelicRules(False, False);
+    Check(G.IsLocked(25) and not G.CanPlay(25), 'taken out: locked again');
+    G.SetRelicRules(False, True);
+    Check(G.CanPlay(25), 'put back: let through');
+    Check(G.PlayTableau(25), 'play it');
+    G.SetRelicRules(False, False);
+    G.SetRelicRules(False, True);
+    G.SetMark(23, MarkChained);
+    Check(G.IsLocked(23), 'taking it out and putting it back does not give a second break');
+    G.SetMark(23, MarkNone);
+    G.SetRelicRules(False, False);
+    Check(G.Undo, 'undo the break with no Pick equipped');
+    Check(not G.BreakUsed, 'it is still given back');
+    G.SetRelicRules(False, True);
+    Check(G.CanPlay(25), 'and can be used again');
   finally
     G.Free;
   end;
@@ -627,12 +643,14 @@ begin
         G.Deal(D, FullStock - Random(4));
         D.Free;
         G.SetHazard(Kind);
-        G.SetRelicRules(Random(2) = 0, Random(2));
+        G.SetRelicRules(Random(2) = 0, Random(2) = 0);
         G.GetState(Start);
         for Steps := 1 to 90 do
         begin
           if G.IsWon or G.IsStuck then Break;
           Acted := False;
+          if Random(8) = 0 then G.SetRelicRules(Random(2) = 0, Random(2) = 0);    { the relics change in mid-hand }
+          if G.IsWon or G.IsStuck then Break;
           if (Random(6) = 0) and G.CanUndo then
           begin
             G.Undo;
@@ -651,8 +669,8 @@ begin
           if not Acted or G.IsWon then Break;
           G.GetState(A);
           Inc(Moves);
-          if (A.BreakStart = 1) and (A.BreakLeft = 0) then Inc(Breaks);
-          if A.FeedOnce and (A.WasteCount - 1 - A.Plays > FeedEvery) then Inc(Skips);
+          if A.BreakUsed then Inc(Breaks);
+          if G.FeedsOnce and (A.WasteCount - 1 - A.Plays > FeedEvery) then Inc(Skips);
           if not G2.SetState(A) then
           begin
             Inc(Rejected);
@@ -666,7 +684,7 @@ begin
         if not G.IsWon then
         begin
           G.GetState(B);
-          Check((B.BreakLeft = B.BreakStart) and (B.BreakStart = Start.BreakStart), 'undone to the start: the break is back');
+          Check(not B.BreakUsed and not Start.BreakUsed, 'undone to the start: the break is back');
           Check(B.WasteCount = 1, 'and the deal is as it was');
         end;
       end;
@@ -698,7 +716,7 @@ begin
     { with it he feeds once: the 4th draw, and never again }
     G.Deal(BuildDeck(Ranks, 3, 7));
     G.SetHazard(hzHunger);
-    G.SetRelicRules(True, 0);
+    G.SetRelicRules(True, False);
     for N := 1 to 3 do G.DrawStock;
     Check(not G.LastMoveAte, 'with the Spoon the first three draws eat nothing');
     G.DrawStock;
@@ -713,6 +731,16 @@ begin
     { undoing back past the feeding gives the card back }
     while G.CanUndo do G.Undo;
     Check(G.StockCount = 23, 'undone to the start: every stock card is back, the eaten one too');
+    { the Spoon equipped late: he fed on the 4th draw, and now he is held to that }
+    G.SetRelicRules(False, False);
+    for N := 1 to 4 do G.DrawStock;
+    Check(G.LastMoveAte, 'no Spoon: the 4th draw feeds');
+    G.SetRelicRules(True, False);
+    for N := 5 to 8 do G.DrawStock;
+    Check(not G.LastMoveAte, 'the Spoon put on after that: the 8th draw feeds nothing');
+    G.SetRelicRules(False, False);
+    for N := 9 to 12 do G.DrawStock;
+    Check(G.LastMoveAte, 'and taken out again, he feeds on the 12th as usual');
   finally
     G.Free;
   end;
@@ -731,21 +759,15 @@ begin
     D.Shuffle;
     G.Deal(D);
     G.SetHazard(hzChained);
-    G.SetRelicRules(True, 1);
+    G.SetRelicRules(True, True);
     G.GetState(A);
     Check(G2.SetState(A), 'a hand with both relic rules is accepted');
-    Bad := A; Bad.BreakStart := 2; Bad.BreakLeft := 2;
-    Check(not G2.SetState(Bad), 'two breaks are refused');
-    Bad := A; Bad.BreakLeft := 2;
-    Check(not G2.SetState(Bad), 'more breaks left than it began with is refused');
-    Bad := A; Bad.BreakLeft := -1;
-    Check(not G2.SetState(Bad), 'a negative count is refused');
-    Bad := A; Bad.BreakStart := 0; Bad.BreakLeft := 0;
+    Bad := A; Bad.BreakUsed := False;
     SetLength(Bad.History, 1);
     Bad.History[0].Draw := False;
     Bad.History[0].Index := 0;
     Bad.History[0].Broke := True;
-    Check(not G2.SetState(Bad), 'a break in the history with no Pick is refused');
+    Check(not G2.SetState(Bad), 'a break in the history that the hand says was never spent is refused');
   finally
     G.Free; G2.Free; D.Free;
   end;
@@ -899,7 +921,7 @@ begin
     and (A.Streak = B.Streak) and (A.BestStreak = B.BestStreak) and (A.Plays = B.Plays)
     and (Length(A.Stock) = Length(B.Stock)) and CardsEqual(A.WasteTop, B.WasteTop)
     and (Length(A.History) = Length(B.History)) and (A.Hazard = B.Hazard)
-    and (A.FeedOnce = B.FeedOnce) and (A.BreakStart = B.BreakStart) and (A.BreakLeft = B.BreakLeft);
+    and (A.BreakUsed = B.BreakUsed);
   if not Result then Exit;
   for I := 0 to TableauSize - 1 do
     if not CardsEqual(A.Tableau[I], B.Tableau[I]) or (A.Removed[I] <> B.Removed[I]) or (A.Marks[I] <> B.Marks[I]) then

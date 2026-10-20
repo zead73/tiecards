@@ -861,6 +861,10 @@ begin
     S := FCtl.MenuButtonCaption(I);
     Text(S, R.Left + ((R.Right - R.Left) - TextW(S)) / 2, R.Top + ((R.Bottom - R.Top) - Px) / 2 - 1);
   end;
+  SetFont(14, False, False);                                  { the version, small, in the corner }
+  FillColor(190, 160, 90);
+  S := FCtl.MenuVersion;
+  Text(S, FW - TextW(S) - 10, FH - 24);
   if FCtl.MenuNote <> '' then
   begin
     R := FCtl.MenuButtonRect(FCtl.MenuButtonCount - 1);

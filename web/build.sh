@@ -6,6 +6,7 @@
 # and open http://127.0.0.1:8765/ (open it through a server, not as a file).
 set -e
 cd "$(dirname "$0")/.."
+tools/check-version.sh
 PAS2JS_DIR=${PAS2JS_DIR:-$HOME/.local/share/tiecards-pas2js/pas2js-linux-x86_64-3.0.1}
 P="$PAS2JS_DIR/bin/pas2js"
 [ -x "$P" ] || { echo "pas2js not found at $PAS2JS_DIR (set PAS2JS_DIR)"; exit 1; }

@@ -592,6 +592,11 @@ begin
     FCv.TextOut((R.Left + R.Right - FCv.TextWidth(Cap)) div 2,
       (R.Top + R.Bottom - FCv.TextHeight(Cap)) div 2, Cap);
   end;
+  FCv.Font.Style := [];                                           { the version, small, in the corner }
+  FCv.Font.Size := 10;
+  FCv.Font.Color := RGBToColor(190, 160, 90);
+  Cap := FCtl.MenuVersion;
+  FCv.TextOut(Full.Right - FCv.TextWidth(Cap) - 10, Full.Bottom - FCv.TextHeight(Cap) - 6, Cap);
   if FCtl.MenuNote <> '' then
   begin
     R := FCtl.MenuButtonRect(FCtl.MenuButtonCount - 1);

@@ -64,9 +64,10 @@ Things worth knowing before you read the code:
 - Style (from the start menu or the Store): card backs, table cloths and the colour of the
   moon over the house. A few are bought at fixed prices and a few are earned with a
   vampire's trophy. They only change how the game looks.
-- Relics (the Relics button in the Store): small permanent helps against the hard vampires,
-  such as a lockpick that frees one chained card a hand. Bought at fixed prices (two can also
-  be earned with trophies), carried in slots that grow with each vampire you kill.
+- Relics (the Relics button in the Store, or on the start menu in the middle of a hand): small
+  permanent helps against the hard vampires, such as a lockpick that frees one chained card a
+  hand. Bought at fixed prices (two can also be earned with trophies), carried in slots that
+  grow with each vampire you kill. A relic works the moment you equip it.
 - Progress is saved automatically (the hand after every move, coins and cards as
   they change). The Menu also has manual save slots for both modes.
 
@@ -128,6 +129,19 @@ publish, copy the contents of `web/dist/` into any folder of a website. Offline
 play uses a service worker, which browsers only run on **https** pages (and
 localhost). More detail, including how saved games are kept and the iPad
 Home Screen advice, is in [`web/README.md`](web/README.md).
+
+## Versions
+
+The version is `MAJOR.MINOR.PATCH` (a patch for fixes, a minor for anything that changes how
+the game plays or what it offers; 1.0 will be the full release). It is written in one place,
+`src/version.pas`, and shown small in the corner of the start menu; the Windows program
+carries it in its file properties (made from it by `make-resources.sh`). `CHANGELOG.md` records what changed in each version. To
+make a release: write its `## X.Y.Z` section in `CHANGELOG.md`, run
+
+    tools/set-version.sh X.Y.Z
+
+commit, and tag the commit `vX.Y.Z`. Every build script runs `tools/check-version.sh`, which
+stops the build if the changelog does not start with the version in `src/version.pas`.
 
 ## Tests
 

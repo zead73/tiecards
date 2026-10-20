@@ -260,10 +260,9 @@ begin
     L.Add('bites=' + IntToStr(H.Bites));
     L.Add('hazard=' + IntToStr(H.Game.Hazard));
     L.Add('marks=' + MarksToStr(H.Game.Marks));
-    L.Add('relics=' + IntToStr(H.Relics));
+    L.Add(Format('forgiven=%d %d', [H.ForgivenBite, H.ForgivenMiss]));
     if H.FreeHintUsed then L.Add('freehint=1') else L.Add('freehint=0');
-    if H.Game.FeedOnce then L.Add('feedonce=1') else L.Add('feedonce=0');
-    L.Add(Format('breaks=%d %d', [H.Game.BreakStart, H.Game.BreakLeft]));
+    if H.Game.BreakUsed then L.Add('breakused=1') else L.Add('breakused=0');
     L.Add('undo=' + MovesToStr(H.Game.History));
     Result := L.Text;
   finally
@@ -371,33 +370,32 @@ begin
       if not TryStrToInt(L.Values['hazard'], H.Game.Hazard) then Exit;
     if L.IndexOfName('marks') >= 0 then
       if not StrToMarks(L.Values['marks'], H.Game.Marks) then Exit;
-    { relics: a save from before them has none of these lines }
-    H.Relics := 0;
+    { relics: what the hand has already used. A save from before them has none of these lines
+      (and the old relics=, feedonce= and breaks= lines of the days when a hand kept its own
+      relics are ignored: the relics in use are the ones equipped now) }
+    H.ForgivenBite := 0;
+    H.ForgivenMiss := 0;
     H.FreeHintUsed := False;
-    H.Game.FeedOnce := False;
-    H.Game.BreakStart := 0;
-    H.Game.BreakLeft := 0;
-    if L.IndexOfName('relics') >= 0 then
-      if not TryStrToInt(L.Values['relics'], H.Relics) or (H.Relics < 0) then Exit;
+    H.Game.BreakUsed := False;
+    if L.IndexOfName('forgiven') >= 0 then
+      if not ParseInts(L.Values['forgiven'], 2, Nums) then Exit
+      else
+      begin
+        H.ForgivenBite := Nums[0];
+        H.ForgivenMiss := Nums[1];
+      end;
     if L.IndexOfName('freehint') >= 0 then
     begin
       S := L.Values['freehint'];
       if (S <> '0') and (S <> '1') then Exit;
       H.FreeHintUsed := S = '1';
     end;
-    if L.IndexOfName('feedonce') >= 0 then
+    if L.IndexOfName('breakused') >= 0 then
     begin
-      S := L.Values['feedonce'];
+      S := L.Values['breakused'];
       if (S <> '0') and (S <> '1') then Exit;
-      H.Game.FeedOnce := S = '1';
+      H.Game.BreakUsed := S = '1';
     end;
-    if L.IndexOfName('breaks') >= 0 then
-      if not ParseInts(L.Values['breaks'], 2, Nums) then Exit
-      else
-      begin
-        H.Game.BreakStart := Nums[0];
-        H.Game.BreakLeft := Nums[1];
-      end;
     { the moves undo can take back. A save from the one-move days says just
       "undo=0" or "undo=1" (and the old snapshot lines): it loads with nothing
       to undo. }

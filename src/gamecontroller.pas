@@ -23,7 +23,7 @@ interface
 uses
   SysUtils, Types, Math, Cards, TriPeaks, Inventory, Session, Sound, Anim, Stage,
   NewGameAnim, Vampires, Story, Campaign, Duel, DuelSession, DuelInfo, Scenes,
-  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules, Trophies, Cosmetics, Relics;
+  Settings, HandFile, CampaignSlots, StartOver, Storage, Specials, Records, Rules, Trophies, Cosmetics, Relics, Version;
 
 const
   { The table is laid out on a fixed design grid and scaled to fit. }
@@ -249,6 +249,7 @@ type
     function MenuButtonEnabled(I: Integer): Boolean;  { Save needs a hand that can be saved }
     function MenuTitleRect: TRect;
     function MenuSubtitle: string;                   { under the title: the campaign's name }
+    function MenuVersion: string;                    { 'v0.9.1': drawn small in a corner of the menu }
     property MenuNote: string read FMenuNote;         { e.g. the cheat's answer }
     { Typing on the menu: a hidden word gives 900 coins (cheat mode, for testing). }
     procedure TypeChar(C: Char);
@@ -466,11 +467,13 @@ const
 
 function TGameController.MenuButtonCount: Integer;
 begin
-  if FCanQuit then Result := 7 else Result := 6;
+  if FCanQuit then Result := 8 else Result := 7;
 end;
 
 { 0 Campaign, 1 Free Play, 2 Save game, 3 Load game (those two share a row),
-  4 Rules, 5 Style (those two share a row), then Quit. }
+  4 Rules, 5 Style (those two share a row), then 6 Relics, and Quit (7) beside it
+  where the program can quit. Relics are here because the Store is shut in the middle
+  of a hand, and a relic should be equipped whenever it is needed. }
 function TGameController.MenuButtonCaption(I: Integer): string;
 begin
   case I of
@@ -480,7 +483,8 @@ begin
     3: Result := 'Load game';
     4: Result := 'Rules';
     5: Result := 'Style';
-    6: Result := 'Quit';
+    6: Result := 'Relics';
+    7: Result := 'Quit';
   else
     Result := '';
   end;
@@ -496,6 +500,11 @@ begin
   Result := FStory.CampaignTitle;
 end;
 
+function TGameController.MenuVersion: string;
+begin
+  Result := 'v' + AppVersion;
+end;
+
 function TGameController.MenuTitleRect: TRect;
 begin
   Result := Rect(0, FVH * 4 div 100, FVW, FVH * 25 div 100);
@@ -505,8 +514,7 @@ function TGameController.MenuButtonRect(I: Integer): TRect;
 var
   BW, BH, Gap, Top, X, Row, Rows, HalfW: Integer;
 begin
-  Rows := 4;
-  if FCanQuit then Rows := 5;
+  Rows := 5;
   BW := Min(380, FVW * 62 div 100);
   BH := Max(34, Min(56, FVH * 7 div 100));
   Gap := BH div 4;
@@ -520,7 +528,7 @@ begin
     2, 3: Row := 2;
     4, 5: Row := 3;
   else
-    Row := 4;                                  { Quit, on its own row }
+    Row := 4;                                  { Relics, with Quit beside it }
   end;
   if I = 4 then
     Result := Rect(X, Top + Row * (BH + Gap), X + HalfW, Top + Row * (BH + Gap) + BH)
@@ -529,6 +537,10 @@ begin
   else if I = 2 then
     Result := Rect(X, Top + Row * (BH + Gap), X + HalfW, Top + Row * (BH + Gap) + BH)
   else if I = 3 then
+    Result := Rect(X + BW - HalfW, Top + Row * (BH + Gap), X + BW, Top + Row * (BH + Gap) + BH)
+  else if (I = 6) and FCanQuit then
+    Result := Rect(X, Top + Row * (BH + Gap), X + HalfW, Top + Row * (BH + Gap) + BH)
+  else if I = 7 then
     Result := Rect(X + BW - HalfW, Top + Row * (BH + Gap), X + BW, Top + Row * (BH + Gap) + BH)
   else
     Result := Rect(X, Top + Row * (BH + Gap), X + BW, Top + Row * (BH + Gap) + BH);
@@ -545,7 +557,7 @@ begin
   Changed;
 end;
 
-{ Campaign (I = 0), Free Play (1), Save game (2), Load game (3) or Quit (4).
+{ Campaign (I = 0), Free Play (1), Save game (2), Load game (3), Rules (4), Style (5), Relics (6) or Quit (7).
   Choosing the mode already being played just goes back to the table. }
 procedure TGameController.MenuChoose(I: Integer);
 begin
@@ -585,7 +597,8 @@ begin
       Changed;
     end;
     5: ActionOpenStyle;
-    6:
+    6: ActionOpenRelics;
+    7:
       if FCanQuit and Assigned(FOnQuit) then FOnQuit();
   end;
 end;
@@ -1548,7 +1561,7 @@ end;
 procedure TGameController.KeyPress(IsEscape: Boolean);
 begin
   if FRulesShow or (FDeleteAsk >= 0) then Exit;
-  if FMenuOpen and (FOverlay in [okSlots, okStyle]) then
+  if FMenuOpen and (FOverlay in [okSlots, okStyle, okRelics]) then
   begin
     if IsEscape then ActionCloseOverlay;     { back to the menu }
     Exit;
@@ -1857,7 +1870,7 @@ end;
 
 procedure TGameController.ActionCloseOverlay;
 begin
-  if FMenuOpen and not (FOverlay in [okSlots, okStyle]) then Exit;
+  if FMenuOpen and not (FOverlay in [okSlots, okStyle, okRelics]) then Exit;
   if FOverlay = okNone then Exit;
   if (FOverlay = okStore) then
   begin
@@ -2042,8 +2055,11 @@ begin
     okRecords:
       Result := 'Your best results on this device. Only won hands count.';
     okRelics:
-      Result := Format('Small things Fenwick sells to help against the vampires. Slots used: %d of %d. A relic works in the hands dealt while it is equipped, and in this hand too if you have not moved yet.',
+    begin
+      Result := Format('Small helps against the vampires. Slots used: %d of %d. A relic works the moment you equip it, even in the hand you are playing.',
         [RelicsInMask(RelicsEquippedMask), RelicSlotCount]);
+      if not ShopOpen then Result := Result + ' Fenwick sells between hands.';
+    end;
     okStyle:
       Result := 'How the cards, the table and the moon look. It never changes how a hand plays.';
     okTrophies:
@@ -2742,7 +2758,7 @@ begin
   begin
     Result.Aside := Format('%d coins', [RelicPrice(R)]);
     Result.ButtonText := 'Buy';
-    Result.ButtonEnabled := FSession.Inventory.CanBuyRelic(R);
+    Result.ButtonEnabled := ShopOpen and FSession.Inventory.CanBuyRelic(R);     { Fenwick sells between hands only }
     if T <> NoRelicTrophy then
       Result.Detail := Result.Detail + ' Also earned with ' + FStory.TrophyName(TrophyKeys[TTrophy(T)]) + '.';
   end;
@@ -2778,6 +2794,11 @@ begin
   begin
     if not RelicOwned(R) then
     begin
+      if not ShopOpen then
+      begin
+        SetToast('Fenwick sells between hands. You can equip what you own now.');
+        Exit;
+      end;
       if not FSession.Inventory.BuyRelic(R) then Exit;
       FSession.SaveNow;
       FToast := 'Bought ' + Name + '.';
@@ -2804,8 +2825,14 @@ begin
     FToast := Trim(FToast);
   end;
   FSettings.Save;
-  FSession.Relics := RelicsEquippedMask;      { a hand not yet started takes the change at once }
-  Changed;
+  FSession.Relics := RelicsEquippedMask;      { a relic works at once, in the hand on the table too }
+  if FCampaignMode and FStarted and (FDuel.Duel.State = dsPlaying) then
+  begin
+    FDuel.RelicsChanged;                      { no move left without the Pick: the hand is lost }
+    ResolveDuel;
+  end
+  else
+    Changed;
 end;
 
 { ---- Style ---- }

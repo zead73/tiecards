@@ -176,7 +176,43 @@ begin
     { with both, each forgives its own }
     S.Relics := RelicBit(rlGarlic) or RelicBit(rlLocket);
     S.NewGameFrom(BuildDeck(R, 5, 7));
-    Check(S.ActiveRelics = (RelicBit(rlGarlic) or RelicBit(rlLocket)), 'a hand keeps the relics it was dealt with');
+    Check(S.Relics = (RelicBit(rlGarlic) or RelicBit(rlLocket)), 'both equipped');
+    { a Locket put on in the middle of the hand forgives only what happens from then on }
+    S.Relics := 0;
+    S.NewGameFrom(BuildDeck(R, 5, 7));
+    S.DrawStock;
+    S.Relics := RelicBit(rlLocket);
+    Check((S.Misses = 1) and (S.ChargedMisses = 1), 'a Locket put on after a miss does not forgive it');
+    S.DrawStock;
+    Check((S.Misses = 2) and (S.ChargedMisses = 1), 'the next miss is the one it forgives');
+    S.DrawStock;
+    Check((S.Misses = 3) and (S.ChargedMisses = 2), 'and only that one');
+    S.Relics := 0;
+    S.Relics := RelicBit(rlLocket);
+    S.DrawStock;
+    Check((S.Misses = 4) and (S.ChargedMisses = 3), 'taken out and put back, it forgives no second miss');
+    S.Relics := 0;
+    Check(S.ChargedMisses = 3, 'taken out, the miss it forgave stays forgiven');
+    S.Inventory.AddUndoCards(5);
+    S.UseUndo;
+    S.UseUndo;
+    S.UseUndo;
+    Check((S.Misses = 1) and (S.ChargedMisses = 1), 'undone past the forgiven miss: it is charged again');
+    S.Relics := RelicBit(rlLocket);
+    S.DrawStock;
+    Check((S.Misses = 2) and (S.ChargedMisses = 1), 'and forgiven again when it comes round once more');
+    { the same for a Garlic Wreath and the bites }
+    S.Relics := 0;
+    S.NewGameFrom(BuildDeck(R, 5, 7));
+    S.Game.SetHazard(hzBitten);
+    for I := 0 to 27 do S.Game.SetMark(I, MarkNone);
+    S.Game.SetMark(27, MarkBitten);
+    S.Game.SetMark(26, MarkBitten);
+    S.Game.SetMark(25, MarkBitten);
+    Check(S.Play(27) and (S.Bites = 1) and (S.ChargedBites = 1), 'a bite with no Garlic is charged');
+    S.Relics := RelicBit(rlGarlic);
+    Check(S.Play(26) and (S.Bites = 2) and (S.ChargedBites = 1), 'a Garlic put on after it forgives the next');
+    Check(S.Play(25) and (S.Bites = 3) and (S.ChargedBites = 2), 'and only that one');
   finally
     S.Free;
   end;
@@ -203,14 +239,24 @@ begin
     Check(S.UseHint = hrNoHintCards, 'a second hint needs a card');
     { saved and loaded: the free hint is not given back }
     S.ExportHand(H);
-    Check(H.FreeHintUsed and HasRelic(H.Relics, rlMoonstone), 'the saved hand remembers');
+    Check(H.FreeHintUsed, 'the saved hand remembers');
     Check(S2.ImportHand(H), 'it loads');
     Check(not S2.FreeHintAvailable and (S2.UseHint = hrNoHintCards), 'a resumed hand does not give the hint back');
-    { a hand under way does not take a new relic; the next one does }
+    { taking it out and putting it back gives nothing; a new hand starts afresh }
     S.Relics := 0;
-    Check(HasRelic(S.ActiveRelics, rlMoonstone), 'a hand under way keeps its relic');
+    Check(not S.FreeHintAvailable, 'taken out: no free hint');
+    S.Relics := RelicBit(rlMoonstone);
+    Check(not S.FreeHintAvailable, 'put back: the hint it gave stays used');
     S.NewGame;
-    Check(not HasRelic(S.ActiveRelics, rlMoonstone), 'the next hand does not have it');
+    Check(S.FreeHintAvailable, 'the next hand has its free hint');
+    { put on in the middle of a hand, it works at once }
+    S.Relics := 0;
+    S.NewGame;
+    S.DrawStock;
+    Check(not S.FreeHintAvailable, 'no relic: no free hint');
+    S.Relics := RelicBit(rlMoonstone);
+    Check(S.FreeHintAvailable and (S.UseHint <> hrNoHintCards), 'equipped after a move: the free hint is there');
+    Check(not S.FreeHintAvailable, 'and used');
   finally
     S.Free;
     S2.Free;
@@ -227,21 +273,54 @@ begin
   try
     S.Relics := RelicBit(rlPick) or RelicBit(rlSpoon);
     S.NewGame;
-    Check((S.Game.BreaksAtStart = 1) and S.Game.FeedsOnce, 'the Pick and the Spoon reach the game''s rules');
+    Check(S.Game.PickOn and S.Game.FeedsOnce, 'the Pick and the Spoon reach the game''s rules');
     S.ExportHand(H);
-    Check(H.Game.FeedOnce and (H.Game.BreakStart = 1), 'and the saved hand');
-    Check(S2.ImportHand(H) and (S2.Game.BreaksAtStart = 1) and S2.Game.FeedsOnce, 'which loads back with them');
-    H.Relics := 0;
-    Check(not S2.ImportHand(H), 'a hand whose rules do not match its relics is refused');
-    S.ExportHand(H);
-    H.Relics := 99;
-    Check(not S2.ImportHand(H), 'and so is an impossible relic set');
+    S2.Relics := 0;
+    Check(S2.ImportHand(H) and not S2.Game.PickOn and not S2.Game.FeedsOnce,
+      'a loaded hand takes the relics equipped now, not the ones it was saved with');
+    S2.Relics := RelicBit(rlPick);
+    Check(S2.Game.PickOn and not S2.Game.FeedsOnce, 'and equipping in the middle of it changes the rules at once');
+    S.Relics := 0;
+    Check(not S.Game.PickOn and not S.Game.FeedsOnce, 'so does taking them out');
+    H.ForgivenBite := 1;
+    Check(not S2.ImportHand(H), 'a forgiven bite that never happened is refused');
+    H.ForgivenBite := 0;
+    H.ForgivenMiss := 2;
+    Check(not S2.ImportHand(H), 'and so is a forgiven miss that never happened');
     S.Relics := 0;
     S.NewGame;
-    Check((S.Game.BreaksAtStart = 0) and not S.Game.FeedsOnce, 'no relics: the plain rules');
+    Check(not S.Game.PickOn and not S.Game.FeedsOnce, 'no relics: the plain rules');
   finally
     S.Free;
     S2.Free;
+  end;
+end;
+
+{ Taking the Pick out when a chained card is the only move left loses the hand. }
+procedure TestPickTakenOutStuck;
+var
+  S: TGameSession;
+  R: array[0..27] of Integer;
+  I: Integer;
+begin
+  for I := 0 to 27 do R[I] := 12;
+  R[25] := 6;                                      { the only card that plays onto the 7, and it is chained }
+  R[24] := 7;
+  S := TGameSession.Create('');
+  S.HazardsOn := False;
+  try
+    S.SetRules(False, 0);
+    S.Relics := RelicBit(rlPick);
+    S.NewGameFrom(BuildDeck(R, 5, 7));
+    S.Game.SetHazard(hzChained);
+    for I := 0 to 27 do S.Game.SetMark(I, MarkNone);
+    S.Game.SetMark(25, MarkChained);
+    Check(S.Game.StockCount = 0, 'test set-up: no stock');
+    Check(not S.Game.IsStuck and S.Game.HasMoves and not S.HandOver, 'with the Pick the chained card is a move');
+    S.Relics := 0;
+    Check(S.Game.IsStuck and S.HandOver, 'taken out: no move is left, and the hand is over');
+  finally
+    S.Free;
   end;
 end;
 
@@ -269,17 +348,26 @@ begin
     S.UseHint;
     S.ExportHand(H);
     Text := HandToText(H, 'x');
-    Check((Pos('relics=', Text) > 0) and (Pos('freehint=1', Text) > 0) and (Pos('breaks=1 1', Text) > 0), 'the new lines are written');
-    Check(TextToHand(Text, H2, Stamp) and (H2.Relics = H.Relics) and H2.FreeHintUsed and (H2.Game.BreakStart = 1) and (H2.Game.BreakLeft = 1),
+    H.Bites := 3;
+    H.ForgivenBite := 2;
+    H.Misses := 4;
+    H.ForgivenMiss := 3;
+    H.Game.BreakUsed := True;
+    Text := HandToText(H, 'x');
+    Check((Pos('forgiven=2 3', Text) > 0) and (Pos('freehint=1', Text) > 0) and (Pos('breakused=1', Text) > 0), 'the new lines are written');
+    Check((Pos('relics=', Text) = 0) and (Pos('feedonce=', Text) = 0) and (Pos('breaks=', Text) = 0), 'and the old ones are not');
+    Check(TextToHand(Text, H2, Stamp) and (H2.ForgivenBite = 2) and (H2.ForgivenMiss = 3) and H2.FreeHintUsed and H2.Game.BreakUsed,
       'and read back');
     { an old save has none of them }
-    DeleteLine(Text, 'relics');
+    DeleteLine(Text, 'forgiven');
     DeleteLine(Text, 'freehint');
-    DeleteLine(Text, 'feedonce');
-    DeleteLine(Text, 'breaks');
-    Check(Pos('relics=', Text) = 0, 'test set-up: the lines are gone');
-    Check(TextToHand(Text, H2, Stamp) and (H2.Relics = 0) and not H2.FreeHintUsed and (H2.Game.BreakStart = 0) and not H2.Game.FeedOnce,
-      'a save without them loads with no relics');
+    DeleteLine(Text, 'breakused');
+    Check(Pos('forgiven=', Text) = 0, 'test set-up: the lines are gone');
+    Check(TextToHand(Text, H2, Stamp) and (H2.ForgivenBite = 0) and (H2.ForgivenMiss = 0) and not H2.FreeHintUsed and not H2.Game.BreakUsed,
+      'a save without them loads with nothing used');
+    { the lines of the days when a hand kept its own relics are ignored }
+    Text := Text + 'relics=3' + #10 + 'feedonce=1' + #10 + 'breaks=1 0' + #10;
+    Check(TextToHand(Text, H2, Stamp) and not H2.Game.BreakUsed, 'a save with those lines still loads');
   finally
     S.Free;
   end;
@@ -313,6 +401,7 @@ begin
   TestCharges;
   TestMoonstone;
   TestRulesRelics;
+  TestPickTakenOutStuck;
   TestHandText;
   TestText;
   if Failures = 0 then WriteLn('ALL RELIC TESTS PASSED')

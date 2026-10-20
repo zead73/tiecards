@@ -240,7 +240,7 @@ begin
     List + RulesBreak +
     'You start with one slot, and every vampire you kill (the trophy on the shelf) gives you another. Equip a relic to put it in a slot; remove one to make room. You keep what you buy.' + RulesBreak +
     'The Steady Locket is also given to you by The Steady Hand trophy, and the Moonstone by Carmilla''s trophy, so you can earn them instead of buying them.' + RulesBreak +
-    'A relic works in every hand dealt while it is equipped, and in the hand on the table too if you have not made a move yet. A hand keeps the relics it began with, even if you save and load it. The Pick, the Spoon and the Wreath only matter against a vampire''s trick, so in Free Play they do nothing.';
+    'Buying is only between hands, but you can equip and remove relics at any time: use the Relics button in the Store, or on the start menu in the middle of a hand. A relic works the moment it is equipped, in the hand you are playing too. What a hand has already used stays used, however you change your relics: the Pick''s one chained card, the Moonstone''s free hint, and the bite and the missed move that the Wreath and the Locket forgave (they forgive the first one that happens while they are equipped). The Pick, the Spoon and the Wreath only matter against a vampire''s trick, so in Free Play they do nothing.';
 end;
 
 function BodyFree(AStory: TStory): string;

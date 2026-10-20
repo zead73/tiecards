@@ -1135,11 +1135,11 @@ begin
   try
     C.StartWithMenu;
     Check(C.MenuOpen, 'the program opens on the start menu');
-    Check(C.MenuButtonCount = 6, 'six buttons where the program cannot quit (the web page)');
+    Check(C.MenuButtonCount = 7, 'seven buttons where the program cannot quit (the web page)');
     Check((C.MenuButtonCaption(0) = 'Campaign') and (C.MenuButtonCaption(1) = 'Free Play')
       and (C.MenuButtonCaption(2) = 'Save game') and (C.MenuButtonCaption(3) = 'Load game')
-      and (C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Style'),
-      'Campaign, Free Play, Save game, Load game, Rules and Style');
+      and (C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Style') and (C.MenuButtonCaption(6) = 'Relics'),
+      'Campaign, Free Play, Save game, Load game, Rules, Style and Relics');
     Check(not C.NeedsTicks, 'nothing animates behind the menu');
     U := C.GetUi;
     Check(not U.StoreEnabled and not U.CardsEnabled and not U.UndoEnabled and not U.RecordsEnabled and not U.SaveEnabled,
@@ -1237,15 +1237,17 @@ begin
     C.CanQuit := True;
     C.OnQuit := @W.OnQuit;
     C.ActionOpenMenu;
-    Check(C.MenuButtonCount = 7, 'seven buttons where the program can quit');
-    Check((C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Style') and (C.MenuButtonCaption(6) = 'Quit'), 'Rules, Style, then Quit');
+    Check(C.MenuButtonCount = 8, 'eight buttons where the program can quit');
+    Check((C.MenuButtonCaption(4) = 'Rules') and (C.MenuButtonCaption(5) = 'Style') and (C.MenuButtonCaption(6) = 'Relics')
+      and (C.MenuButtonCaption(7) = 'Quit'), 'Rules, Style, Relics, then Quit');
     for I := 0 to C.MenuButtonCount - 1 do
       Check((C.MenuButtonRect(I).Left >= 0) and (C.MenuButtonRect(I).Right <= 1520) and (C.MenuButtonRect(I).Bottom <= 584),
         'with Quit as well, button ' + IntToStr(I) + ' is on screen');
     Check((C.MenuButtonRect(5).Left >= C.MenuButtonRect(4).Right) and (C.MenuButtonRect(5).Top = C.MenuButtonRect(4).Top),
       'Style sits beside Rules');
-    Check(C.MenuButtonRect(6).Top >= C.MenuButtonRect(5).Bottom, 'and Quit has its own row below');
-    TapMenuButton(C, 6);
+    Check(C.MenuButtonRect(6).Top >= C.MenuButtonRect(5).Bottom, 'Relics has its own row below');
+    Check((C.MenuButtonRect(7).Left >= C.MenuButtonRect(6).Right) and (C.MenuButtonRect(7).Top = C.MenuButtonRect(6).Top), 'with Quit beside it');
+    TapMenuButton(C, 7);
     Check(W.Quits = 1, 'Quit tells the program to close');
     Check(C.MenuOpen, 'and the menu stays up meanwhile');
   finally
@@ -1674,7 +1676,7 @@ begin
     TapSlotButton(C, 1);
     Check(C.Session.Inventory.BoughtRelic(rlPick) and C.RelicEquipped(rlPick), 'bought, and equipped in the free slot');
     Check((C.OverlayRow(1).ButtonText = 'Remove') and (C.OverlayRow(1).Aside = 'equipped'), 'the row says so');
-    Check(HasRelic(C.Session.ActiveRelics, rlPick) and (C.Session.Game.BreaksAtStart = 1), 'a hand not yet started has it already');
+    Check(C.Session.Game.PickOn, 'a hand not yet started has it already');
     Check(Pos('Bought', C.GetUi.StatusText) > 0, 'with a message: ' + C.GetUi.StatusText);
 
     { the slot is full }
@@ -1693,7 +1695,7 @@ begin
     Check((C.OverlayRow(3).ButtonText = 'Equip') and (C.OverlayRow(3).Aside = ''), 'the Locket is owned through its trophy');
     { take one out }
     TapSlotButton(C, 1);
-    Check(not C.RelicEquipped(rlPick) and (C.Session.Game.BreaksAtStart = 0), 'Remove takes it out of this fresh hand too');
+    Check(not C.RelicEquipped(rlPick) and not C.Session.Game.PickOn, 'Remove takes it out of this fresh hand too');
     Check(C.Session.Inventory.BoughtRelic(rlPick), 'but it is still yours');
 
     { the Moonstone: a free Show move }
@@ -1704,15 +1706,16 @@ begin
     Check(C.GetUi.HintCaption = 'Show move (free)', 'the button says the hint is free');
     Check(C.GetUi.HintEnabled, 'and it works with no hint cards');
 
-    { a hand under way keeps the relics it was dealt with }
+    { a hand under way: a relic taken out is gone at once, and the next hand has what is equipped now }
     TapCard(C, 27);
     C.ActionOpenRelics;
     TapSlotButton(C, 4);
-    Check(not C.RelicEquipped(rlMoonstone) and HasRelic(C.Session.ActiveRelics, rlMoonstone), 'removed, but this hand keeps it');
+    Check(not C.RelicEquipped(rlMoonstone) and not C.Session.FreeHintAvailable, 'removed in the middle of a hand: its free hint goes too');
     C.ActionCloseOverlay;
     C.ActionNew;
     RunOut(C);
-    Check(not HasRelic(C.Session.ActiveRelics, rlMoonstone) and HasRelic(C.Session.ActiveRelics, rlSpoon), 'the next hand has what is equipped now');
+    Check(not HasRelic(C.Session.Relics, rlMoonstone) and HasRelic(C.Session.Relics, rlSpoon) and C.Session.Game.FeedsOnce,
+      'the next hand has what is equipped now');
     C.Free;
 
     { the choice is saved; losing a trophy (or a slot) trims it }
@@ -1732,6 +1735,62 @@ begin
     C.ActionEraseEverything;
     RunOut(C);
     Check(not C.Session.Inventory.BoughtRelic(rlPick) and not C.RelicEquipped(rlSpoon) and not C.RelicEquipped(rlPick), 'Erase everything clears them');
+  finally
+    C.Free; W.Free; D.Free; St.Free;
+  end;
+end;
+
+{ A relic equipped in the middle of a hand, from the start menu, works at once (the Store is shut then). }
+procedure TestRelicsMidHand;
+var
+  St: TStory;
+  C: TGameController;
+  D: TDecks;
+  W: TWatcher;
+  I, Coins: Integer;
+begin
+  WipeStore;
+  St := TStory.Create;
+  St.LoadFromFile(StoryPath);
+  D := TDecks.Create;
+  W := TWatcher.Create;
+  C := NewCtl(St, D, W);
+  try
+    C.Start;
+    RunOut(C);
+    C.ActionToggleMode;
+    ClickThrough(C);
+    RunOut(C);
+    Check(C.Duel.Duel.State = dsPlaying, 'a duel hand is being played');
+    C.Session.Game.SetHazard(hzChained);
+    for I := 0 to TableauSize - 1 do C.Session.Game.SetMark(I, MarkNone);
+    C.Session.Game.SetMark(25, MarkChained);
+    C.Session.Inventory.AddCoins(1000);
+    Check(C.Session.Inventory.BuyRelic(rlPick) and C.Session.Inventory.BuyRelic(rlSpoon), 'test set-up: the player owns the Pick and the Spoon');
+    TapCard(C, 27);
+    TapCard(C, 26);
+    TapCard(C, 25);
+    Check(not C.Game.Removed[25] and (Pos('chained', C.GetUi.StatusText) > 0), 'no Pick equipped: the chained card will not play');
+    Check(not C.GetUi.StoreEnabled, 'the Store is shut in the middle of a hand');
+    { the Relics button on the menu }
+    C.ActionOpenMenu;
+    TapMenuButton(C, 6);
+    Check((C.Overlay = okRelics) and C.MenuOpen, 'the menu opens the Relics page');
+    Check((C.OverlayRow(1).ButtonText = 'Equip') and C.OverlayRow(1).ButtonEnabled, 'the Pick can be equipped');
+    TapSlotButton(C, 1);
+    Check(C.RelicEquipped(rlPick) and C.Session.Game.PickOn, 'equipped: it works at once');
+    { Fenwick does not sell in the middle of a hand }
+    Coins := C.Session.Inventory.Coins;
+    Check(not C.OverlayRow(0).ButtonEnabled and (C.OverlayRow(0).ButtonText = 'Buy'), 'but nothing can be bought now');
+    TapSlotButton(C, 0);
+    Check(not C.Session.Inventory.BoughtRelic(rlGarlic) and (C.Session.Inventory.Coins = Coins), 'a tap on it buys nothing');
+    C.ActionCloseOverlay;
+    Check(C.MenuOpen and (C.Overlay = okNone), 'closing the page goes back to the menu');
+    C.KeyPress(True);
+    Check(not C.MenuOpen, 'and Escape to the table');
+    TapCard(C, 25);
+    Check(C.Game.Removed[25], 'the chained card plays with the Pick');
+    Check(C.Game.Streak = 3, 'and counts as an ordinary play');
   finally
     C.Free; W.Free; D.Free; St.Free;
   end;
@@ -2094,6 +2153,7 @@ begin
   TestStyle;
   TestRelicsPage;
   TestTrickControls;
+  TestRelicsMidHand;
   TestCrossControls;
   TestTrophies;
   TestCampaignTrophies;

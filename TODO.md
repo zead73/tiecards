@@ -116,14 +116,19 @@ Ideas to review later.
       scenes, panel, save slots, Start over, reload-and-resume, no console errors.
       See `web/README.md`. Needs pas2js 3.x (now unpacked in
       `~/.local/share/tiecards-pas2js/`, the default path; set `PAS2JS_DIR` to use another).
-- [ ] **REMIND THE USER: not yet tried on a real tablet or phone** (also the relics in real play). Things to look at: touch
-      feel, the sound (it cannot be heard from here), the text sizes, the
-      phone-sized panel strip (a little cramped under about 500 px wide).
+- [x] **Real tablet:** tried on a real (very old) iPad on 2026-10-20 and everything
+      works. Not yet tried on a phone.
+- [ ] **REMIND THE USER: relics in real play.** Play real hands with relics
+      equipped (Garlic, Lockpick, Spoon, Locket, Moonstone) and see how they feel.
 - [x] **Offline play** done (service worker, 2026-10-10); needs https.
 - [x] **iPad saves:** Safari deletes a site's saved data after seven days of
       Safari use with no visit to the site; a page added to the Home Screen is
       exempt. The advice (Share > Add to Home Screen) is in `README.md` and
       `web/README.md` (2026-10-16).
+- [x] **Versions** (2026-10-20): `src/version.pas` is the one place; `CHANGELOG.md`; `tools/set-version.sh`;
+      every build runs `tools/check-version.sh`; shown on the start menu and in the Windows file properties.
+      A release = write the changelog section, `set-version.sh X.Y.Z`, commit, tag `vX.Y.Z`. 0.9.0 is
+      tagged locally on 54c008f; 0.9.1 is the live-relics change (tag it once it is committed). Tags are not pushed yet.
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
 ## Relics (2026-10-16)
