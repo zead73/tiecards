@@ -118,8 +118,8 @@ Ideas to review later.
       `~/.local/share/tiecards-pas2js/`, the default path; set `PAS2JS_DIR` to use another).
 - [x] **Real tablet:** tried on a real (very old) iPad on 2026-10-20 and everything
       works. Not yet tried on a phone.
-- [ ] **REMIND THE USER: relics in real play.** Play real hands with relics
-      equipped (Garlic, Lockpick, Spoon, Locket, Moonstone) and see how they feel.
+- [ ] **REMIND THE USER: relics in real play.** The Lockpick is confirmed working in real play
+      (2026-10-20, after the live-relics change). Still to try: Garlic, Spoon, Locket, Moonstone.
 - [x] **Offline play** done (service worker, 2026-10-10); needs https.
 - [x] **iPad saves:** Safari deletes a site's saved data after seven days of
       Safari use with no visit to the site; a page added to the Home Screen is
@@ -128,7 +128,7 @@ Ideas to review later.
 - [x] **Versions** (2026-10-20): `src/version.pas` is the one place; `CHANGELOG.md`; `tools/set-version.sh`;
       every build runs `tools/check-version.sh`; shown on the start menu and in the Windows file properties.
       A release = write the changelog section, `set-version.sh X.Y.Z`, commit, tag `vX.Y.Z`. 0.9.0 is
-      tagged locally on 54c008f; 0.9.1 is the live-relics change (tag it once it is committed). Tags are not pushed yet.
+      tagged on 54c008f and 0.9.1 (live relics) on d5f6a13; both tags are pushed.
 - [ ] Keep `tools/check-pas2js.sh` green after any change to `src/` or `web/src/`.
 
 ## Relics (2026-10-16)
