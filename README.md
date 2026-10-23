@@ -130,6 +130,16 @@ play uses a service worker, which browsers only run on **https** pages (and
 localhost). More detail, including how saved games are kept and the iPad
 Home Screen advice, is in [`web/README.md`](web/README.md).
 
+## Homepage
+
+`site/` is a one-page homepage for the game (plain HTML and CSS, no scripts, with its own copies of
+the pictures in `site/img/`). To publish it, copy the contents of `site/` to a folder on a web server
+and put the web build (the contents of `web/dist/`) in a `play/` folder inside it, which is where the
+"Play" buttons point. `tools/publish-local.sh [folder]` does both (the default folder is
+`~/html/tiecards`). `site/sw.js` is only there to retire the service worker that the game used to
+register at that address, before the game moved to `play/`. The download buttons for Linux and
+Windows are placeholders until there are releases to link to.
+
 ## Versions
 
 The version is `MAJOR.MINOR.PATCH` (a patch for fixes, a minor for anything that changes how
@@ -175,6 +185,7 @@ if they are missing. Keep it green after any change to `src/` or `web/src/`.
 | `assets/` | Card faces, vampire and shopkeeper portraits, the house, special-card pictures, the icon, and `story/story.ini` (all the dialogue) |
 | `tests/` | Console test programs, one per area |
 | `docs/` | The screenshots used in this README |
+| `site/` | The homepage (one static page and its pictures) |
 | `tools/` | The art scripts (Python), `check-pas2js.sh`, the icon builder, and a solver used to tune the vampires' difficulty |
 
 The desktop and the web page are thin: they draw what `GameController` says and
