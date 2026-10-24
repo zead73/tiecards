@@ -118,8 +118,10 @@ Ideas to review later.
       `~/.local/share/tiecards-pas2js/`, the default path; set `PAS2JS_DIR` to use another).
 - [x] **Real tablet:** tried on a real (very old) iPad on 2026-10-20 and everything
       works. Not yet tried on a phone.
-- [ ] **REMIND THE USER: relics in real play.** The Lockpick is confirmed working in real play
-      (2026-10-20, after the live-relics change). Still to try: Garlic, Spoon, Locket, Moonstone.
+- [x] **Relics in real play** (2026-10-24): the Lockpick was confirmed after the live-relics change, and the user
+      has now tried Garlic, Spoon, Locket and Moonstone too. All five work as expected.
+- [ ] **Before release:** other people are playing it to check that the feel is right. Wait for their feedback;
+      the user decides what changes (balance, wording, anything else).
 - [x] **Offline play** done (service worker, 2026-10-10); needs https.
 - [x] **iPad saves:** Safari deletes a site's saved data after seven days of
       Safari use with no visit to the site; a page added to the Home Screen is
