@@ -257,10 +257,10 @@ export function createRoom(bridge, glue, renderer) {
   chandLight.position.set(0, 2.5, -1.2);
   group.add(chandLight);
   const fireLight = new THREE.PointLight(0xff7a2c, 18, 8, 2);
-  fireLight.position.set(0, 0.7, -4.2);
+  fireLight.position.set(ROOM.x1 - 1.0, 0.7, -1.6);
   group.add(fireLight);
   const moonLight = new THREE.PointLight(0x7f9cff, 7, 7, 2);
-  moonLight.position.set(2.7, 2.0, -1.2);
+  moonLight.position.set(0, 2.0, ROOM.z0 + 0.8);
   group.add(moonLight);
 
   // floor, rug, ceiling
@@ -352,7 +352,8 @@ export function createRoom(bridge, glue, renderer) {
   // the fireplace in the middle of the far wall, with the portraits over it
   {
     const f = new THREE.Group();
-    f.position.set(0, 0, ROOM.z0 + 0.3);
+    f.position.set(ROOM.x1 - 0.3, 0, -1.6);          // on the right wall: you turn your head to see it
+    f.rotation.y = -Math.PI / 2;
     const stone = new THREE.MeshLambertMaterial({ map: stoneTexture() });
     add(f, box, stone, -0.95, 0.75, 0, 0.5, 1.5, 0.6);
     add(f, box, stone, 0.95, 0.75, 0, 0.5, 1.5, 0.6);
@@ -402,10 +403,9 @@ export function createRoom(bridge, glue, renderer) {
   // the tall window on the right wall, with the moon and curtains
   const windowState = { key: '', mat: null };
   {
-    const wz = -1.4, ww = 1.1, wh = 1.9, wy = 0.95;
+    const ww = 1.4, wh = 2.0, wy = 0.8;
     const wg = new THREE.Group();
-    wg.position.set(ROOM.x1 - 0.01, 0, wz);
-    wg.rotation.y = -Math.PI / 2;
+    wg.position.set(0, 0, ROOM.z0 + 0.01);            // in the middle of the far wall, straight ahead
     const shape = new THREE.Shape();
     shape.moveTo(-ww / 2, wy);
     shape.lineTo(ww / 2, wy);
@@ -432,7 +432,7 @@ export function createRoom(bridge, glue, renderer) {
     add(wg, new THREE.CylinderGeometry(0.02, 0.02, ww + 1.4, 8), brass, 0, 3.2, 0.2).rotation.z = Math.PI / 2;
     group.add(wg);
     // moonlight on the floor: the window's pane laid across the boards
-    const beam = add(group, plane, new THREE.MeshBasicMaterial({ map: glowTexture('rgba(150,175,255,0.55)', 'rgba(150,175,255,0)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), 2.0, 0.006, wz, 1.9, 2.6, 1);
+    const beam = add(group, plane, new THREE.MeshBasicMaterial({ map: glowTexture('rgba(150,175,255,0.55)', 'rgba(150,175,255,0)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), 0, 0.006, ROOM.z0 + 1.7, 2.0, 2.8, 1);
     beam.rotation.set(-Math.PI / 2, 0, 0.1);
   }
 
@@ -491,11 +491,10 @@ export function createRoom(bridge, glue, renderer) {
     add(c, box, brass, 0, 1.45, 0.3, 0.2, 0.06, 0.05);
     group.add(c);
   }
-  armchair(-1.9, -3.55, 0.55, 0x1d3b2f);
-  armchair(1.9, -3.55, -0.55, 0x4a1020);
+  armchair(2.2, -2.9, -Math.PI / 2 - 0.3, 0x4a1020);           // one by the fire, on its far side, so that it does not stand in front of it
   {
     const t = new THREE.Group();
-    t.position.set(2.6, 0, -3.5);
+    t.position.set(3.05, 0, -0.45);                                // a lamp table on the near side of the fire
     add(t, new THREE.CylinderGeometry(0.28, 0.28, 0.04, 20), wood, 0, 0.7, 0);
     add(t, new THREE.CylinderGeometry(0.03, 0.05, 0.7, 10), wood, 0, 0.35, 0);
     add(t, new THREE.CylinderGeometry(0.16, 0.18, 0.03, 16), wood, 0, 0.015, 0);

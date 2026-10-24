@@ -132,8 +132,8 @@ function layout() {
   tableGroup.position.set(0, headY - 0.5, -0.85);
   tableGroup.rotation.set(-(Math.PI / 2 - SLOPE), 0, 0);
   hudBar.position.set(0, headY - 0.02, -1.25);
-  hudSide.position.set(-0.98, headY - 0.22, -0.85);
-  hudSide.rotation.set(0, 0.75, 0);
+  hudSide.position.set(-1.2, headY - 0.2, -0.88);
+  hudSide.rotation.set(0, 0.8, 0);
   hudKeys.position.set(0.6, headY + 0.12, -1.2);
   if (room) room.setBoard(headY, boardSize[0], boardSize[1]);
 }
