@@ -58,6 +58,7 @@
   <button id="btnMenu">Menu</button>
   <button id="btnStartOver">Start over</button>
   <button id="btnRecords">Records</button>
+  <button id="btnVr" style="display:none">Enter VR</button>
   <div id="status"></div>
 </div>
 <div id="stage">
@@ -121,6 +122,7 @@
 <script src="glue.js"></script>
 <script src="tiecardsweb.js"></script>
 <script>rtl.run();</script>
+<script type="module" src="vr.js?v=__BUILD__"></script>
 <script>
   // offline play: keep the game on the device (needs https, or localhost)
   if ('serviceWorker' in navigator && window.isSecureContext) {

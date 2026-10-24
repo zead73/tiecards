@@ -82,6 +82,16 @@ use with no visit to that site. A page added to the Home Screen is exempt, so op
 the page, tap **Share**, then **Add to Home Screen**, and start the game from that
 icon. The game also asks the browser to keep its data.
 
+### In VR (Meta Quest)
+
+The web version has an **Enter VR** button in a browser that supports WebXR, such as the Quest's.
+The cards lie on a table in a gothic parlour and a controller (or a hand) is the pointer. VR needs
+the page to be served over **https** (or from `localhost`); a certificate your browser does not
+trust can still be clicked through. The VR code (`web/vr*.js`) and the three.js library it uses
+(`web/vendor/`, MIT licence) are only loaded when VR is used. Add `?vrpreview` to the page's
+address to try it in an ordinary window with the mouse, `?vrdebug` to see the frame rate, and
+`?vrroom=0` to turn the parlour off if a headset runs it slowly.
+
 ## Building
 
 Everything below is run from the project folder.

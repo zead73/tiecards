@@ -88,17 +88,17 @@ STORY RCDATA "../assets/story/story.ini"
 MAINICON ICON "../assets/icon/tiecards.ico"
 TIECARDS_ICO RCDATA "../assets/icon/tiecards.ico"
 1 VERSIONINFO
-FILEVERSION 0,9,1,0
-PRODUCTVERSION 0,9,1,0
+FILEVERSION 0,10,0,0
+PRODUCTVERSION 0,10,0,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
     BLOCK "040904E4"
     BEGIN
       VALUE "FileDescription", "Tiecards, a gothic Tri Peaks solitaire"
-      VALUE "FileVersion", "0.9.1"
+      VALUE "FileVersion", "0.10.0"
       VALUE "ProductName", "Tiecards"
-      VALUE "ProductVersion", "0.9.1"
+      VALUE "ProductVersion", "0.10.0"
       VALUE "LegalCopyright", "MIT licence"
     END
   END

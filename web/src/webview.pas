@@ -30,6 +30,8 @@ type
     FShaded: array[0..PortraitCount - 1, 0..PortraitLevels] of TJSHTMLCanvasElement;
     FShadedW, FShadedH: array[0..PortraitCount - 1] of Integer;
     FTouch: Boolean;
+    FOriginY: Integer;               { where the drawing area starts down the canvas (VR puts a toolbar above it) }
+    procedure PaintInner(W, H: Integer; Dpr: Double);
     function Face(const C: TCard): TJSObject;
     function Portrait(V, W, H: Integer; Brightness: Double): TJSObject;
     function BackCard(W, H: Integer): TJSObject;
@@ -77,7 +79,17 @@ type
     { Draws everything for an area of W x H CSS pixels; Dpr = device pixels per
       CSS pixel (the canvas must already have that many pixels). }
     procedure Paint(W, H: Integer; Dpr: Double);
+    { VR with a 3D table: only the duel panel is drawn, on a clear background (the cards,
+      the cloth and the rest are 3D objects there). }
+    procedure PaintHud(W, H: Integer; Dpr: Double);
+    { A vampire's mark as the 2D table draws it, onto R of this view's canvas. }
+    procedure DrawMarkAt(const R: TRect; Kind: Integer);
+    { The card back in the chosen style, at W x H CSS pixels (cached). }
+    function BackCardCanvas(W, H: Integer): TJSObject;
     property TouchScreen: Boolean read FTouch write FTouch;
+    { The drawing area starts OriginY CSS pixels down the canvas, and nothing is drawn
+      outside it (0 for the page's own canvas). }
+    property OriginY: Integer read FOriginY write FOriginY;
   end;
 
 implementation
@@ -1747,13 +1759,55 @@ end;
 { ---- everything ---- }
 
 procedure TWebView.Paint(W, H: Integer; Dpr: Double);
+begin
+  FCtx.save;
+  FCtx.setTransform(Dpr, 0, 0, Dpr, 0, FOriginY * Dpr);
+  FCtx.beginPath;
+  FCtx.rect(0, 0, W, H);
+  FCtx.clip;
+  PaintInner(W, H, Dpr);
+  FCtx.restore;
+end;
+
+procedure TWebView.PaintHud(W, H: Integer; Dpr: Double);
+begin
+  FW := W;
+  FH := H;
+  FDpr := Dpr;
+  FCtx.save;
+  FCtx.setTransform(Dpr, 0, 0, Dpr, 0, FOriginY * Dpr);
+  FCtx.beginPath;
+  FCtx.rect(0, 0, W, H);
+  FCtx.clip;
+  FCtx.clearRect(0, 0, W, H);
+  FCtx.textBaseline := 'top';
+  FCtx.textAlign := 'left';
+  FCtx.imageSmoothingEnabled := True;
+  FCtl.SetViewport(W, H);
+  DrawPanel;
+  FCtx.restore;
+end;
+
+procedure TWebView.DrawMarkAt(const R: TRect; Kind: Integer);
+begin
+  FDpr := 1;
+  FCtx.textBaseline := 'top';
+  DrawMark(R, Kind);
+end;
+
+function TWebView.BackCardCanvas(W, H: Integer): TJSObject;
+begin
+  Result := BackCard(W, H);
+end;
+
+procedure TWebView.PaintInner(W, H: Integer; Dpr: Double);
 var
   St: TStage;
 begin
   FW := W;
   FH := H;
   FDpr := Dpr;
-  FCtx.setTransform(Dpr, 0, 0, Dpr, 0, 0);
+  FCtx.setTransform(Dpr, 0, 0, Dpr, 0, FOriginY * Dpr);
   FCtx.textBaseline := 'top';
   FCtx.textAlign := 'left';
   FCtx.imageSmoothingEnabled := True;

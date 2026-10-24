@@ -12,7 +12,7 @@ unit Version;
 interface
 
 const
-  AppVersion = '0.9.1';
+  AppVersion = '0.10.0';
 
 implementation
 

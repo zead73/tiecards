@@ -3,6 +3,21 @@
 What changed in each version. The newest is on top. The version number lives in
 `src/version.pas` and is changed with `tools/set-version.sh` (see the README).
 
+## 0.10.0 - 2026-10-24
+
+- **VR mode for the Meta Quest** (and other headsets with WebXR), in the web version. Open the
+  game in the headset's browser (the address must be https, or localhost) and press **Enter VR**.
+  The cards lie on a tilted felt board on a Victorian slope-top table in a gothic parlour: a
+  fireplace with the portraits of the three vampires, a moonlit window showing your Style moon,
+  bookcases, candles and a chandelier. The toolbar and the duel panel float around the table.
+  Point a controller (or a hand) and pull the trigger to tap; squeeze a grip to bring everything
+  back in front of you. The menu, the Store, story scenes, dialogs and the win picture appear on
+  one large flat panel in front of you. Your Style choices (card backs, table cloth, moon) are used.
+- The VR code is loaded only when VR is used: other players download nothing extra.
+- `?vrpreview` tries the same scene in an ordinary window with the mouse; `?vrdebug` shows the frame
+  rate and draw counts, and says why VR is missing; `?vrroom=0` turns the parlour off.
+- Includes three.js r160 (MIT licence), in `web/vendor/`, used only by the VR mode.
+
 ## 0.9.1 - 2026-10-20
 
 - Relics work the moment they are equipped, in the hand you are playing too. Before,
