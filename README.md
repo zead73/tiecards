@@ -7,7 +7,9 @@ with his own rules and his own trick, and a shopkeeper (Fenwick Grimm) who sells
 fixed-price help.
 
 The desktop game runs on Linux and Windows. The same game also runs in a web
-browser (tablets and phones included), and can be played offline there.
+browser (tablets and phones included), and can be played offline there. In a
+VR headset's browser (made for the Meta Quest 2) it can also be played on a 3D
+table in a gothic parlour: see [In VR](#in-vr-meta-quest).
 
 ## Screenshots
 
@@ -41,6 +43,13 @@ Fenwick Grimm's Store, where everything has a fixed price:
 The vampires speak between hands:
 
 ![Lady Carmilla Nox speaking after a lost hand](docs/screenshots/vampire.png)
+
+In VR on a Meta Quest, the cards lie on a table in a parlour, with the portraits of the
+three vampires over the fireplace:
+
+![The table in VR, with the three peaks of cards and the parlour behind](docs/screenshots/vr-table.jpg)
+
+![The parlour's fireplace, with the three vampire portraits above it](docs/screenshots/vr-fireplace.jpg)
 
 ## Playing
 
