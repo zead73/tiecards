@@ -282,6 +282,7 @@ export async function startXR(btn) {
   placed = 0;
   setMode(false);
   window.TCVR.enter();
+  if (DEBUG) window.TCVR.setCheats(true);              // ?vrdebug: a "+900 coins" button on the menu, for testing
   renderer.setAnimationLoop(function (t) {
     if (!gameFrame(t)) return;
     if (placed < 3) {                                    // wait for a few frames: the head pose is not valid at first
@@ -348,6 +349,7 @@ export function startPreview() {
   size();
   window.addEventListener('resize', size);
   window.TCVR.enter();
+  if (DEBUG) window.TCVR.setCheats(true);
   const ndc = new THREE.Vector2();
   function aim(ev) {
     const r = el.getBoundingClientRect();

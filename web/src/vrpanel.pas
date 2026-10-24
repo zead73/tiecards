@@ -32,7 +32,8 @@ const
   vbExit = 8;
   vbSkip = 9;
   vbCancel = 10;
-  VrButtons = 11;
+  vbCheat = 11;              { the testing button on the menu (only with ?vrdebug) }
+  VrButtons = 12;
 
 type
   TVrDialog = (vdNone, vdOver, vdCross, vdDelete, vdInitials, vdRules);
@@ -69,6 +70,7 @@ type
     FOnAnswer: TVrAnswerEvent;
     FOnInvalidate: TVrNotify;
     FDebug: string;
+    FCheats: Boolean;
     FMarkCv: array[1..3] of TJSHTMLCanvasElement;
     procedure RRect(X, Y, W, H, R: Double);
     procedure SetFont(Px: Double; Bold, Italic: Boolean);
@@ -102,6 +104,10 @@ type
     function StyleList: TJSArray;
     procedure Tap(X, Y: Double);
     property DebugText: string read FDebug write FDebug;
+    { Testing aid for a headset, where the menu's hidden cheat word cannot be typed: with this
+      on, the menu shows a "+900 coins" button that types the word for you. }
+    property Cheats: Boolean read FCheats write FCheats;
+    procedure TypeCheat;
     procedure OpenDialog(K: TVrDialog; const APrompt: string; const ADefault: string = '');
     procedure CloseDialog;
     property Dialog: TVrDialog read FDialog;
@@ -274,6 +280,12 @@ begin
     FCtx.textAlign := 'right';
     FCtx.fillText(FDebug, VrW - 12, 70);
     FCtx.textAlign := 'left';
+  end;
+  FBtnShown[vbCheat] := FCheats and FCtl.MenuOpen and (FCtl.Overlay = okNone) and (FDialog = vdNone);
+  if FBtnShown[vbCheat] then
+  begin
+    FBtn[vbCheat] := Rect(12, VrH - 52, 232, VrH - 12);
+    DrawButton(FBtn[vbCheat], '+900 coins (test)', True, False, 16);
   end;
   { Skip and Cancel float over the game }
   FBtnShown[vbSkip] := U.CanSkip;
@@ -520,6 +532,16 @@ begin
   DrawToolbar;
   if FDialog <> vdNone then DrawDialog;
   FCtx.restore;
+end;
+
+{ Types the menu's hidden cheat word, as the keyboard would on the page. }
+procedure TVrPanel.TypeCheat;
+const
+  Word = 'coffeeisnotblood';
+var
+  I: Integer;
+begin
+  for I := 1 to Length(Word) do FCtl.TypeChar(Word[I]);
 end;
 
 procedure TVrPanel.PaintHud;

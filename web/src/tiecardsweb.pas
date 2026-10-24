@@ -22,6 +22,7 @@ type
   TVrBackFn = function: TJSObject of object;
   TVrDebugFn = procedure(const S: string) of object;
   TVrStyleFn = function: TJSArray of object;
+  TVrBoolFn = procedure(B: Boolean) of object;
 
   TWebApp = class
   private
@@ -87,6 +88,7 @@ type
     function VrBack: TJSObject;
     procedure VrDebug(const S: string);
     function VrStyle: TJSArray;
+    procedure VrSetCheats(B: Boolean);
     procedure VrButton(Id: Integer);
     procedure VrAnswer(K: TVrDialog; Choice: Integer; const Text: string);
     procedure VrInvalidate;
@@ -679,6 +681,12 @@ begin
   Result := FVrView.BackCardCanvas(328, 464);
 end;
 
+procedure TWebApp.VrSetCheats(B: Boolean);
+begin
+  FVrPanel.Cheats := B;
+  FVrDirty := True;
+end;
+
 function TWebApp.VrStyle: TJSArray;
 begin
   Result := FVrPanel.StyleList;
@@ -712,6 +720,7 @@ begin
     vbExit: FVrExit := True;
     vbSkip: FCtl.SkipPressed;
     vbCancel: FCtl.ActionCancel;
+    vbCheat: FVrPanel.TypeCheat;
   end;
   FVrDirty := True;
 end;
@@ -745,6 +754,7 @@ var
   BackCb: TVrBackFn;
   DebugCb: TVrDebugFn;
   StyleCb: TVrStyleFn;
+  CheatsCb: TVrBoolFn;
 begin
   W := VrW;
   H := VrH;
@@ -759,11 +769,12 @@ begin
   BackCb := @VrBack;
   DebugCb := @VrDebug;
   StyleCb := @VrStyle;
+  CheatsCb := @VrSetCheats;
   asm
     window.TCVR = {
       canvas: this.FVrCanvas, width: W, height: H, dpr: D, barHeight: 84,
       enter: EnterCb, exit: ExitCb, frame: FrameCb, tap: TapCb,
-      table: TableCb, tapSlot: SlotCb, mark: MarkCb, back: BackCb, debug: DebugCb, style: StyleCb
+      table: TableCb, tapSlot: SlotCb, mark: MarkCb, back: BackCb, debug: DebugCb, style: StyleCb, setCheats: CheatsCb
     };
   end;
 end;
