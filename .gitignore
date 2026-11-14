@@ -13,3 +13,5 @@ tiecards_test_*/
 __pycache__/
 *.bak
 *~
+# the homepage is kept outside the project and is never committed
+/site/

@@ -11,5 +11,4 @@ case "$V" in
 esac
 grep -q "^## $V\b" CHANGELOG.md || { echo "Add a '## $V' section to CHANGELOG.md first."; exit 1; }
 sed -i "s/^\( *AppVersion = '\).*\(';.*\)/\1$V\2/" src/version.pas
-sed -i "s/\(<strong>Tiecards<\/strong> v\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/\1$V/" site/index.html
 tools/check-version.sh

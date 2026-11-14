@@ -11,9 +11,4 @@ if [ "$L" != "$V" ]; then
   echo "Write the '## $V' section in CHANGELOG.md, or fix the version with tools/set-version.sh"
   exit 1
 fi
-S=$(sed -n 's/.*<strong>Tiecards<\/strong> v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' site/index.html)
-if [ "$S" != "$V" ]; then
-  echo "check-version: site/index.html says '$S', src/version.pas says '$V' (tools/set-version.sh $V fixes it)"
-  exit 1
-fi
 echo "version $V"
