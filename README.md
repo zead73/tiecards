@@ -162,6 +162,15 @@ make a release: write its `## X.Y.Z` section in `CHANGELOG.md`, run
 commit, and tag the commit `vX.Y.Z`. Every build script runs `tools/check-version.sh`, which
 stops the build if the changelog does not start with the version in `src/version.pas`.
 
+## Releases
+
+`./build-appimage.sh` makes `dist/tiecards-<version>-x86_64.AppImage`, one file for Linux that needs no installation and no
+Qt: make it executable (`chmod +x tiecards-*.AppImage`) and run it. The program is compiled in a Debian 12 container
+(`packaging/appimage/`, needs docker) and carries the Qt5 libraries it needs; it runs on Debian 12 and Ubuntu 22.04 and
+newer. `packaging/make-installer.sh` makes `dist/tiecards-<version>-setup.exe`, a Windows installer (needs `makensis`, from
+NSIS) that installs for the current user without administrator rights; it cross-compiles the program first if needed.
+Both read the version from `src/version.pas`.
+
 ## Tests
 
 The rules and the whole game flow are UI-free, so the tests are plain console

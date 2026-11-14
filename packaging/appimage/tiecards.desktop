@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tiecards
+GenericName=Tri Peaks solitaire
+Comment=A gothic Tri Peaks solitaire with a campaign of duels against three vampires
+Exec=tiecards
+Icon=tiecards
+Terminal=false
+Categories=Game;CardGame;
+Keywords=solitaire;tri peaks;cards;vampires;
+StartupWMClass=tiecards
